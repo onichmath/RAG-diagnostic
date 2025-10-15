@@ -1,0 +1,2 @@
+## Retriever 
+The Retriever is tasked with embedding the user query and retrieving the most relevant documents in the database. These documents will likely be the top-k most similar. The Retriever may reformulate the user query to make the embeddings more efficient, and may use metadata when searching the database.

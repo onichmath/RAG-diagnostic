@@ -37,7 +37,6 @@ class LangChainIngest:
         self.chunk_overlap = chunk_overlap
         self.separators = separators or ["\n\n", "\n", " ", ""]
         
-        # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -82,7 +81,6 @@ class LangChainIngest:
         """
         logger.info(f"Loading text files from {directory}")
         
-        # Use LangChain's DirectoryLoader for text files
         loader = DirectoryLoader(
             str(directory),
             glob="**/*.txt",
@@ -138,7 +136,6 @@ class LangChainIngest:
             if isinstance(doc_id, Path):
                 doc_id = doc_id.stem
             
-            # Create MedRAG format record
             medrag_doc = {
                 "id": f"{doc_id}_chunk_{i:04d}",
                 "contents": doc.page_content,
@@ -173,24 +170,20 @@ class LangChainIngest:
         """
         logger.info(f"Processing guidelines from {guidelines_dir}")
         
-        # Load PDFs using LangChain
         documents = self.load_pdfs_from_directory(guidelines_dir)
+        #print(documents)
         
         if not documents:
             logger.warning("No PDF documents found")
             return output_dir / dataset_name
         
-        # Chunk documents
         chunks = self.chunk_documents(documents, metadata={"source": "guideline"})
         
-        # Convert to MedRAG format
         medrag_docs = self.documents_to_medrag_format(chunks, source="guideline")
         
-        # Convert to HuggingFace Dataset
         df = pd.DataFrame(medrag_docs)
         dataset = Dataset.from_pandas(df)
         
-        # Save dataset
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / dataset_name
         dataset.save_to_disk(str(output_path))
@@ -220,7 +213,6 @@ class LangChainIngest:
         dataset_name_clean = dataset_name.split('/')[-1]
         output_path = output_dir / f"{dataset_name_clean}_{max_documents}docs"
         
-        # Check if already exists
         if not force_download and output_path.exists():
             try:
                 dataset = load_from_disk(str(output_path))
@@ -231,10 +223,8 @@ class LangChainIngest:
         
         logger.info(f"📥 Loading {max_documents:,} documents from {dataset_name} dataset...")
         
-        # Load dataset with streaming and limit documents
         dataset = load_dataset(dataset_name, split="train", streaming=True)
         
-        # Convert IterableDataset to regular Dataset for saving
         logger.info("Converting streaming dataset to regular dataset...")
         data_list = []
         for i, item in enumerate(dataset):
@@ -242,16 +232,12 @@ class LangChainIngest:
             if i % 10000 == 0 and i > 0:
                 logger.info(f"Processed {i:,} documents...")
             
-            # Stop when we reach the limit
             if i + 1 >= max_documents:
                 logger.info(f"Reached document limit of {max_documents:,}")
                 break
         
-        # Create regular Dataset from list
-        from datasets import Dataset
         regular_dataset = Dataset.from_list(data_list)
         
-        # Save dataset
         output_dir.mkdir(parents=True, exist_ok=True)
         regular_dataset.save_to_disk(str(output_path))
         
@@ -282,7 +268,6 @@ class LangChainIngest:
         
         logger.info("🔄 Loading MedRAG datasets...")
         
-        # Load PubMed dataset
         pubmed_path = self.load_huggingface_dataset(
             "MedRAG/pubmed",
             corpus_dir,
@@ -291,7 +276,6 @@ class LangChainIngest:
         )
         loaded["pubmed"] = pubmed_path
         
-        # Load textbooks dataset
         textbook_path = self.load_huggingface_dataset(
             "MedRAG/textbooks",
             corpus_dir,
@@ -304,8 +288,7 @@ class LangChainIngest:
         return loaded
 
 
-# Simplified API functions
-def process_guidelines_simple(
+def process_guidelines(
     guidelines_dir: Path = Path("data/guidelines"),
     output_dir: Path = Path("data/corpus_norm"),
     chunk_size: int = 300,
@@ -327,7 +310,7 @@ def process_guidelines_simple(
     return ingest.process_guidelines(guidelines_dir, output_dir)
 
 
-def load_medrag_data_simple(
+def load_medrag_data(
     corpus_dir: Path = Path("data/corpus_raw"),
     pubmed_docs: int = 100000,
     textbook_docs: int = 10000,
@@ -354,7 +337,7 @@ def load_medrag_data_simple(
     )
 
 
-def list_available_datasets_simple(corpus_dir: Path = Path("data/corpus_raw")) -> Dict[str, int]:
+def list_available_datasets(corpus_dir: Path = Path("data/corpus_raw")) -> Dict[str, int]:
     """
     Simple function to list available datasets.
     

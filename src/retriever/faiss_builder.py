@@ -142,6 +142,7 @@ def load_faiss_index(
 ) -> FAISS:
     """Load existing FAISS index."""
     logger.info(f"Loading FAISS index from {index_path}")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     
     embeddings = HuggingFaceEmbeddings(
         model_name=embedding_model,

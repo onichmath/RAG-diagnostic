@@ -138,30 +138,17 @@ def main():
     logger.info("Step 4: Building FAISS index...")
     logger.info(f"Using embedding model: {args.embedding_model}")
     
-    if args.use_fast_faiss:
-        logger.info("Using optimized FAISS index building...")
-        logger.info(f"FAISS settings: batch_size={args.faiss_batch_size}, index_type={args.faiss_index_type}, use_gpu={args.use_gpu}")
-        index_path = build_faiss_index_fast(
-            corpus_dir=Path("data/corpus_raw"),
-            corpus_norm_dir=Path("data/corpus_norm"),
-            output_dir=Path("data/indices"),
-            embedding_model=args.embedding_model,
-            batch_size=args.faiss_batch_size,
-            use_gpu=args.use_gpu,
-            faiss_index_type=args.faiss_index_type
-        )
-    else:
-        logger.info("Using standard FAISS index building...")
-        index_path = build_faiss_index(
-            corpus_dir=Path("data/corpus_raw"),
-            corpus_norm_dir=Path("data/corpus_norm"),
-            output_dir=Path("data/indices"),
-            embedding_model=args.embedding_model,
-            batch_size=args.faiss_batch_size,
-            use_gpu=args.use_gpu
-        )
+    index_path = build_faiss_index(
+        corpus_dir=Path("data/corpus_raw"),
+        corpus_norm_dir=Path("data/corpus_norm"),
+        output_dir=Path("data/indices"),
+        embedding_model=args.embedding_model,
+        batch_size=args.faiss_batch_size,
+        use_gpu=args.use_gpu
+    )
     
     logger.info(f"FAISS index built and saved to: {index_path}")
+    #index_path = "data/indices/faiss_index"
     
     # Step 5: Test retrieval (optional)
     if not args.skip_test:
@@ -181,21 +168,23 @@ def main():
                 query_text = query_data.get('query_text', '')
                 expected_docs = query_data.get('expected_gold_docs', [])
                 
-                logger.info(f"\nTest Query {i} ({query_id}): {query_text}")
-                logger.info(f"Expected documents: {expected_docs}")
+                #logger.info(f"\nTest Query {i} ({query_id}): {query_text}")
+                #logger.info(f"Expected documents: {expected_docs}")
                 
-                results = vectorstore.similarity_search(query_text, k=3)
+                results = vectorstore.similarity_search(query_text, k=50)
                 
-                logger.info("Top 3 results:")
+                logger.info("Top 50 results:")
                 for j, doc in enumerate(results, 1):
                     doc_id = doc.metadata.get('doc_id', 'Unknown')
                     source = doc.metadata.get('source', 'Unknown')
+                    print(doc.metadata)
+                    exit()
                     is_expected = doc_id in expected_docs if expected_docs else False
                     expected_marker = " ✅" if is_expected else ""
                     
-                    logger.info(f"  {j}. {doc.page_content[:150]}...")
-                    logger.info(f"     Source: {source}")
-                    logger.info(f"     Doc ID: {doc_id}{expected_marker}")
+                    #logger.info(f"  {j}. {doc.page_content[:150]}...")
+                    #logger.info(f"     Source: {source}")
+                    #logger.info(f"     Doc ID: {doc_id}{expected_marker}")
                 
                 # Check if any expected documents were found
                 found_expected = any(doc.metadata.get('doc_id') in expected_docs for doc in results)

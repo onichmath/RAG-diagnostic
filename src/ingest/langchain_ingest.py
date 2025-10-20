@@ -56,7 +56,6 @@ class LangChainIngest:
         """
         logger.info(f"Loading PDFs from {directory}")
         
-        # Use LangChain's DirectoryLoader for PDFs
         loader = DirectoryLoader(
             str(directory),
             glob="**/*.pdf",
@@ -106,10 +105,8 @@ class LangChainIngest:
         """
         logger.info(f"Chunking {len(documents)} documents")
         
-        # Split documents
         chunks = self.text_splitter.split_documents(documents)
         
-        # Add additional metadata if provided
         if metadata:
             for chunk in chunks:
                 chunk.metadata.update(metadata)
@@ -131,7 +128,6 @@ class LangChainIngest:
         medrag_docs = []
         
         for i, doc in enumerate(documents):
-            # Extract document ID from metadata or create one
             doc_id = doc.metadata.get("source", f"doc_{i:04d}")
             if isinstance(doc_id, Path):
                 doc_id = doc_id.stem
@@ -171,7 +167,6 @@ class LangChainIngest:
         logger.info(f"Processing guidelines from {guidelines_dir}")
         
         documents = self.load_pdfs_from_directory(guidelines_dir)
-        #print(documents)
         
         if not documents:
             logger.warning("No PDF documents found")

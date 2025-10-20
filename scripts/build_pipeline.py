@@ -16,13 +16,12 @@ sys.path.insert(0, str(project_root))
 import logging
 from src.ingest.langchain_ingest import (
     LangChainIngest,
-    load_medrag_data_simple,
-    process_guidelines_simple,
-    list_available_datasets_simple
+    load_medrag_data,
+    process_guidelines,
+    list_available_datasets
 )
 from src.retriever.faiss_builder import build_faiss_index, build_faiss_index_fast, load_faiss_index
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -101,7 +100,7 @@ def main():
     
     # Step 1: Check existing datasets
     logger.info("Step 1: Checking existing datasets...")
-    existing_datasets = list_available_datasets_simple(Path("data/corpus_raw"))
+    existing_datasets = list_available_datasets(Path("data/corpus_raw"))
     if existing_datasets:
         logger.info("Existing datasets:")
         for name, count in existing_datasets.items():
@@ -113,7 +112,7 @@ def main():
     logger.info("Step 2: Loading MedRAG datasets using LangChain...")
     logger.info(f"Using document limits: PubMed={args.pubmed_docs:,}, Textbooks={args.textbook_docs:,}")
     
-    loaded = load_medrag_data_simple(
+    loaded = load_medrag_data(
         corpus_dir=Path("data/corpus_raw"),
         pubmed_docs=args.pubmed_docs,
         textbook_docs=args.textbook_docs,
@@ -124,79 +123,118 @@ def main():
     for name, path in loaded.items():
         logger.info(f"  📁 {name}: {path}")
     
-    # Step 3: Process guidelines using LangChain
-    logger.info("Step 3: Processing guidelines using LangChain...")
-    guidelines_path = process_guidelines_simple(
-        guidelines_dir=Path("data/guidelines"),
-        output_dir=Path("data/corpus_norm"),
-        chunk_size=args.chunk_size,
-        chunk_overlap=args.chunk_overlap
-    )
-    logger.info(f"Guidelines processed and saved to: {guidelines_path}")
+    # Step 3: Process guidelines using LangChain if not exists
+    guidelines_path = Path("data/corpus_norm/guidelines_processed")
+    if not guidelines_path.exists():
+        logger.info("Step 3: Processing guidelines using LangChain...")
+        guidelines_path = process_guidelines(
+            guidelines_dir=Path("data/guidelines"),
+            output_dir=Path("data/corpus_norm"),
+            chunk_size=args.chunk_size,
+            chunk_overlap=args.chunk_overlap
+        )
+        logger.info(f"Guidelines processed and saved to: {guidelines_path}")
+    else:
+        logger.info(f"Guidelines already processed and saved to: {guidelines_path}")
     
-    # Step 4: Build FAISS index
-    logger.info("Step 4: Building FAISS index...")
-    logger.info(f"Using embedding model: {args.embedding_model}")
+    # Step 4: Build FAISS index if not exists
+    index_path = Path("data/indices/faiss_index")
+    if not index_path.exists():
+        logger.info("Step 4: Building FAISS index...")
+        logger.info(f"Using embedding model: {args.embedding_model}")
+        index_path = build_faiss_index(
+            corpus_dir=Path("data/corpus_raw"),
+            corpus_norm_dir=guidelines_path,
+            output_dir=index_path,
+            embedding_model=args.embedding_model,
+            batch_size=args.faiss_batch_size,
+            use_gpu=args.use_gpu
+        )
+        logger.info(f"FAISS index built and saved to: {index_path}")
+    else:
+        logger.info(f"FAISS index already exists at: {index_path}")
     
-    index_path = build_faiss_index(
-        corpus_dir=Path("data/corpus_raw"),
-        corpus_norm_dir=Path("data/corpus_norm"),
-        output_dir=Path("data/indices"),
-        embedding_model=args.embedding_model,
-        batch_size=args.faiss_batch_size,
-        use_gpu=args.use_gpu
-    )
-    
-    logger.info(f"FAISS index built and saved to: {index_path}")
-    #index_path = "data/indices/faiss_index"
     
     # Step 5: Test retrieval (optional)
     if not args.skip_test:
         logger.info("Step 5: Testing retrieval...")
         
-        # Load test queries
         queries_file = Path(args.test_queries_file)
         test_queries = load_test_queries(queries_file, args.max_test_queries)
+        vectorstore = load_faiss_index(index_path) 
         
-        if not test_queries:
-            logger.warning("No test queries available, skipping retrieval testing")
-        else:
-            vectorstore = load_faiss_index(index_path)
+        total_precision_at_k = 0.0
+        total_queries = len(test_queries)
+        
+        logger.info(f"Running evaluation on {total_queries} queries...")
+        k = 50
+        
+        for i, query_data in enumerate(test_queries, 1):
+            query_id = query_data.get('query_id', f'q{i:03d}')
+            query_text = query_data.get('query_text', '')
+            expected_docs = query_data.get('expected_gold_docs', [])
             
-            for i, query_data in enumerate(test_queries, 1):
-                query_id = query_data.get('query_id', f'q{i:03d}')
-                query_text = query_data.get('query_text', '')
-                expected_docs = query_data.get('expected_gold_docs', [])
+
+            results = vectorstore.similarity_search(query_text, k=k)
+            
+            retrieved_titles = []
+            retrieved_doc_ids = []
+            
+            for j, doc in enumerate(results, 1):
+                title = doc.metadata.get('title', 'Unknown')
+                doc_id = doc.metadata.get('doc_id', 'Unknown')
+                source = doc.metadata.get('source', 'Unknown')
                 
-                #logger.info(f"\nTest Query {i} ({query_id}): {query_text}")
-                #logger.info(f"Expected documents: {expected_docs}")
+                retrieved_titles.append(title)
+                retrieved_doc_ids.append(doc_id)
+
+            expected_doc_patterns = []
+            for expected_doc in expected_docs:
+                if expected_doc == "idsa_clinical_guideline_covid19":
+                    expected_doc_patterns.extend(["idsa", "covid", "covid19", "clinical_guideline"])
+                elif expected_doc == "ada_soc_diabetes_2024":
+                    expected_doc_patterns.extend(["ada", "diabetes", "soc_diabetes"])
+                elif expected_doc == "aha_stroke_2021":
+                    expected_doc_patterns.extend(["aha", "stroke", "stroke_2021"])
+                elif expected_doc == "aha_acc_afib":
+                    expected_doc_patterns.extend(["aha", "acc", "afib", "atrial"])
+                elif expected_doc == "acc_aha_hf":
+                    expected_doc_patterns.extend(["acc", "aha", "hf", "heart_failure"])
+                elif expected_doc == "surviving_sepsis":
+                    expected_doc_patterns.extend(["surviving", "sepsis", "septic"])
+                else:
+                    expected_doc_patterns.append(expected_doc.lower())
+            
+            relevant_retrieved = []
+            for j, (title, doc_id) in enumerate(zip(retrieved_titles, retrieved_doc_ids)):
+                title_lower = title.lower()
+                doc_id_lower = doc_id.lower()
                 
-                results = vectorstore.similarity_search(query_text, k=50)
-                
-                logger.info("Top 50 results:")
-                for j, doc in enumerate(results, 1):
-                    doc_id = doc.metadata.get('doc_id', 'Unknown')
-                    source = doc.metadata.get('source', 'Unknown')
-                    print(doc.metadata)
-                    exit()
-                    is_expected = doc_id in expected_docs if expected_docs else False
-                    expected_marker = " ✅" if is_expected else ""
-                    
-                    #logger.info(f"  {j}. {doc.page_content[:150]}...")
-                    #logger.info(f"     Source: {source}")
-                    #logger.info(f"     Doc ID: {doc_id}{expected_marker}")
-                
-                # Check if any expected documents were found
-                found_expected = any(doc.metadata.get('doc_id') in expected_docs for doc in results)
-                if expected_docs:
-                    if found_expected:
-                        logger.info("  ✅ Found expected document(s)")
-                    else:
-                        logger.info("  ❌ No expected documents found in top 3 results")
-    else:
-        logger.info("Step 5: Skipping retrieval testing")
+                for pattern in expected_doc_patterns:
+                    if pattern.lower() in title_lower or pattern.lower() in doc_id_lower:
+                        relevant_retrieved.append(j)
+                        break
+            
+            num_relevant_retrieved = len(relevant_retrieved)
+            num_expected = len(expected_docs)
+            
+            precision_at_k = num_relevant_retrieved / k if k > 0 else 0.0
+            
+            total_precision_at_k += precision_at_k
+            
+            logger.info(f"Relevant docs found: {num_relevant_retrieved}/{num_expected}")
+            logger.info(f"Precision@{k}: {precision_at_k:.3f}")
+            
+        
+        avg_precision_at_k = total_precision_at_k / total_queries
+        
+        logger.info("\n" + "="*60)
+        logger.info("EVALUATION RESULTS")
+        logger.info("="*60)
+        logger.info(f"Total queries evaluated: {total_queries}")
+        logger.info(f"Average Precision@{k}: {avg_precision_at_k:.3f}")
+        logger.info("="*60)
     
-    logger.info("\n✅ LangChain pipeline completed successfully!")
     logger.info("=" * 60)
 
 

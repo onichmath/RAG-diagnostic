@@ -42,7 +42,7 @@ git clone <your-repo-url>
 cd RAG-diagnostic
 
 # Install dependencies
-pip install -r requirements.txt
+conda env create -f env.yml
 ```
 
 ### 2. Download Clinical Guidelines

@@ -1,14 +1,11 @@
-## Ingest 
-The ingestion phase collects, cleans, chunks, embeds, and indexes the raw documents.
+# Ingest Module
 
-### Collection 
+This module handles data ingestion, processing, and chunking for the RAG diagnostic pipeline using LangChain and HuggingFace datasets.
 
-### Cleaning 
+## 📁 Module Structure
 
-### Chunking 
-Split text into small segments -> LangChain has text splitters.
+### `langchain_ingest.py`
+Simplified ingest using LangChain document loaders and splitters.
 
-### Embedding
-Embed chunks into vectors -> pre-trained models will likely be used.
-
-### Indexing
+**Classes:**
+- `LangChainIngest`: Main class for document processing

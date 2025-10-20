@@ -1,0 +1,64 @@
+{
+  "queries": [
+    {
+      "query_id": "q001",
+      "query_text": "What is the recommended treatment for community-acquired pneumonia in hospitalized adults?",
+      "expected_gold_docs": ["idsa_clinical_guideline_covid19"]
+    },
+    {
+      "query_id": "q002", 
+      "query_text": "What are the current guidelines for managing type 2 diabetes in adults?",
+      "expected_gold_docs": ["ada_soc_diabetes_2024"]
+    },
+    {
+      "query_id": "q003",
+      "query_text": "What is the recommended treatment for acute ischemic stroke within 4.5 hours of symptom onset?",
+      "expected_gold_docs": ["aha_stroke_2021"]
+    },
+    {
+      "query_id": "q004",
+      "query_text": "How should atrial fibrillation be managed according to current guidelines?",
+      "expected_gold_docs": ["aha_acc_afib"]
+    },
+    {
+      "query_id": "q005",
+      "query_text": "What are the current recommendations for COVID-19 treatment in hospitalized patients?",
+      "expected_gold_docs": ["idsa_clinical_guideline_covid19"]
+    },
+    {
+      "query_id": "q006",
+      "query_text": "How should heart failure be managed in patients with reduced ejection fraction?",
+      "expected_gold_docs": ["acc_aha_hf"]
+    },
+    {
+      "query_id": "q007",
+      "query_text": "What are the guidelines for managing sepsis and septic shock?",
+      "expected_gold_docs": ["surviving_sepsis"]
+    },
+    {
+      "query_id": "q008",
+      "query_text": "What is the recommended approach for diabetes management in hospitalized patients?",
+      "expected_gold_docs": ["ada_soc_diabetes_2024"]
+    },
+    {
+      "query_id": "q009",
+      "query_text": "How should stroke prevention be managed in patients with atrial fibrillation?",
+      "expected_gold_docs": ["aha_acc_afib", "aha_stroke_2021"]
+    },
+    {
+      "query_id": "q010",
+      "query_text": "What are the current recommendations for heart failure with preserved ejection fraction?",
+      "expected_gold_docs": ["acc_aha_hf"]
+    },
+    {
+      "query_id": "q011",
+      "query_text": "How should sepsis be diagnosed and treated according to current guidelines?",
+      "expected_gold_docs": ["surviving_sepsis"]
+    },
+    {
+      "query_id": "q012",
+      "query_text": "What are the guidelines for diabetes screening and prevention?",
+      "expected_gold_docs": ["ada_soc_diabetes_2024"]
+    }
+  ]
+}

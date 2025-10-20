@@ -44,7 +44,6 @@ def build_faiss_index(
     all_texts = []
     all_metadata = []
     
-    # Load MedRAG datasets from disk
     for dataset_path in corpus_dir.glob("*_*"):
         if dataset_path.is_dir():
             logger.info(f"Loading dataset from {dataset_path.name}...")
@@ -62,7 +61,6 @@ def build_faiss_index(
                         "title": item.get("title", "")
                     })
     
-    # Load processed guidelines from corpus_norm
     guidelines_path = corpus_norm_dir / "guidelines_processed"
     if guidelines_path.exists():
         logger.info("Loading processed guidelines...")
@@ -82,7 +80,6 @@ def build_faiss_index(
     
     logger.info(f"Loaded {len(all_texts)} texts for indexing")
     
-    # Determine device
     device = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
     logger.info(f"Using device: {device}")
     
@@ -91,16 +88,13 @@ def build_faiss_index(
         model_name=embedding_model,
         model_kwargs={'device': device}
     )
-    logger.info("✅ Embedding model loaded successfully")
+    logger.info("Embedding model loaded successfully")
     
-    # Build FAISS index with batch processing
     logger.info(f"Building FAISS index with batch size {batch_size} (this may take a while)...")
     
-    # Process in batches to avoid memory issues and improve speed
     vectorstore = None
     total_batches = (len(all_texts) + batch_size - 1) // batch_size
     
-    # Use tqdm for progress tracking
     with tqdm(total=len(all_texts), desc="Building FAISS index", unit="texts") as pbar:
         for i in range(0, len(all_texts), batch_size):
             batch_num = (i // batch_size) + 1
@@ -110,14 +104,12 @@ def build_faiss_index(
             batch_metadata = all_metadata[i:end_idx]
             
             if vectorstore is None:
-                # Create initial vectorstore with first batch
                 vectorstore = FAISS.from_texts(
                     texts=batch_texts,
                     embedding=embeddings,
                     metadatas=batch_metadata
                 )
             else:
-                # Add subsequent batches to existing vectorstore
                 batch_vectors = embeddings.embed_documents(batch_texts)
                 vectorstore.add_texts(
                     texts=batch_texts,
@@ -127,7 +119,6 @@ def build_faiss_index(
             
             pbar.update(len(batch_texts))
     
-    # Save index
     output_dir.mkdir(parents=True, exist_ok=True)
     index_path = output_dir / "faiss_index"
     vectorstore.save_local(str(index_path))
@@ -187,11 +178,9 @@ def build_faiss_index_fast(
     
     logger.info("Building optimized FAISS index...")
     
-    # Load all texts (same as before)
     all_texts = []
     all_metadata = []
     
-    # Load MedRAG datasets from disk
     for dataset_path in corpus_dir.glob("*_*"):
         if dataset_path.is_dir():
             logger.info(f"Loading dataset from {dataset_path.name}...")
@@ -207,7 +196,6 @@ def build_faiss_index_fast(
                         "title": item.get("title", "")
                     })
     
-    # Load processed guidelines
     guidelines_path = corpus_norm_dir / "guidelines_processed"
     if guidelines_path.exists():
         logger.info("Loading processed guidelines...")
@@ -227,7 +215,6 @@ def build_faiss_index_fast(
     
     logger.info(f"Loaded {len(all_texts)} texts for indexing")
     
-    # Initialize embeddings
     device = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
     logger.info(f"Using device: {device}")
     
@@ -236,12 +223,10 @@ def build_faiss_index_fast(
         model_kwargs={'device': device}
     )
     
-    # Get embedding dimension from a sample
     sample_embedding = embeddings.embed_query("sample text")
     dimension = len(sample_embedding)
     logger.info(f"Embedding dimension: {dimension}")
     
-    # Create FAISS index based on type
     if faiss_index_type == "IVF":
         # IVF (Inverted File) - good balance of speed and memory
         nlist = min(4096, len(all_texts) // 100)  # Number of clusters
@@ -254,7 +239,6 @@ def build_faiss_index_fast(
         # Flat index - exact search, slower but most accurate
         index = faiss.IndexFlatL2(dimension)
     
-    # Process texts in batches and build index
     all_vectors = []
     
     with tqdm(total=len(all_texts), desc="Generating embeddings", unit="texts") as pbar:
@@ -272,28 +256,22 @@ def build_faiss_index_fast(
     vectors_array = np.array(all_vectors).astype('float32')
     logger.info(f"Generated embeddings array shape: {vectors_array.shape}")
     
-    # Train index if needed (for IVF)
     if faiss_index_type == "IVF":
         logger.info("Training IVF index...")
         index.train(vectors_array)
     
-    # Add vectors to index
     logger.info("Adding vectors to FAISS index...")
     index.add(vectors_array)
     
-    # Save index and metadata
     output_dir.mkdir(parents=True, exist_ok=True)
     index_path = output_dir / "faiss_index"
     
-    # Save FAISS index
     faiss.write_index(index, str(index_path / "index.faiss"))
     
-    # Save metadata
     metadata_path = index_path / "metadata.json"
     with open(metadata_path, 'w') as f:
         json.dump(all_metadata, f, indent=2)
     
-    # Save index info
     info = {
         "embedding_model": embedding_model,
         "dimension": dimension,

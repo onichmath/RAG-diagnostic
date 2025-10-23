@@ -236,7 +236,7 @@ class LangChainIngest:
         output_dir.mkdir(parents=True, exist_ok=True)
         regular_dataset.save_to_disk(str(output_path))
         
-        logger.info(f"✅ Saved {len(regular_dataset):,} documents to {output_path}")
+        logger.info(f"Saved {len(regular_dataset):,} documents to {output_path}")
         return output_path
     
     def load_all_medrag_data(

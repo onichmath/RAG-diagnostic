@@ -95,7 +95,7 @@ def main():
     """Run the complete pipeline using LangChain."""
     args = parse_args()
     
-    logger.info("🚀 Starting RAG Diagnostic Pipeline (LangChain)")
+    logger.info("Starting RAG Diagnostic Pipeline (LangChain)")
     logger.info("=" * 60)
     
     # Step 1: Check existing datasets
@@ -121,7 +121,7 @@ def main():
     
     logger.info("Loaded datasets:")
     for name, path in loaded.items():
-        logger.info(f"  📁 {name}: {path}")
+        logger.info(f"{name}: {path}")
     
     # Step 3: Process guidelines using LangChain if not exists
     guidelines_path = Path("data/corpus_norm/guidelines_processed")

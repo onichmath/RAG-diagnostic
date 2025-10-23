@@ -6,7 +6,6 @@ Uses LangChain for simplified document processing.
 
 import sys
 import argparse
-import json
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
@@ -18,6 +17,7 @@ from src.ingest.langchain_ingest import (
     list_available_datasets
 )
 from src.retriever.faiss_builder import build_faiss_index, build_faiss_index_fast, load_faiss_index
+from src.eval.eval import evaluate_rag_system, save_results
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,29 +67,18 @@ def parse_args():
     parser.add_argument("--test-queries-file", type=str, 
                        default="data/requests/queries.json",
                        help="Path to JSON file containing test queries")
-    parser.add_argument("--max-test-queries", type=int, default=5,
+    parser.add_argument("--max-test-queries", type=int, default=10,
                        help="Maximum number of test queries to run")
     parser.add_argument("--skip-test", action="store_true",
                        help="Skip retrieval testing")
+    parser.add_argument("--output-file", type=str, default="data/FAISS_evaluation_results.json",
+                       help="Path to JSON file containing evaluation results") 
+    parser.add_argument("--k-array", type=list, default=[5, 10, 20, 50, 100],
+                       help="Array of k values to evaluate")
     
     return parser.parse_args()
 
 
-def load_test_queries(queries_file: Path, max_queries: int = 5) -> list:
-    """Load test queries from JSON file."""
-    try:
-        with open(queries_file, 'r') as f:
-            data = json.load(f)
-        
-        queries = data.get('queries', [])
-        queries = queries[:max_queries]
-        
-        logger.info(f"Loaded {len(queries)} test queries from {queries_file}")
-        return queries
-        
-    except Exception as e:
-        logger.error(f"Error loading test queries: {e}")
-        return []
 
 
 def main():
@@ -136,7 +125,7 @@ def main():
         exit(1)
     
     logger.info("Step 3: Processing guidelines using LangChain...")
-    guidelines_path = Path("data/corpus_norm/guidelines_processed/guidelines_processed.arrow")
+    guidelines_path = Path("data/corpus_norm/guidelines_processed/")
     if not guidelines_path.exists():
         guidelines_path = ingest.process_guidelines_to_disk(
             guidelines_dir=Path("data/guidelines"),
@@ -167,65 +156,9 @@ def main():
     # Step 5: Test retrieval (optional)
     if not args.skip_test:
         logger.info("Step 5: Testing retrieval...")
-        
-        queries_file = Path(args.test_queries_file)
-        test_queries = load_test_queries(queries_file, args.max_test_queries)
-        vectorstore = load_faiss_index(index_path) 
-        
-        total_precision_at_k = 0.0
-        total_queries = len(test_queries)
-        
-        logger.info(f"Running evaluation on {total_queries} queries...")
-        k = 50
-        
-        for i, query_data in enumerate(test_queries, 1):
-            query_id = query_data.get('query_id', f'q{i:03d}')
-            query_text = query_data.get('query_text', '')
-            expected_docs = query_data.get('expected_gold_docs', [])
-            
-
-            results = vectorstore.similarity_search(query_text, k=k)
-            
-            retrieved_titles = []
-            retrieved_doc_ids = []
-            
-            for j, doc in enumerate(results, 1):
-                title = doc.metadata.get('title', 'Unknown')
-                doc_id = doc.metadata.get('doc_id', 'Unknown')
-                source = doc.metadata.get('source', 'Unknown')
-                
-                retrieved_titles.append(title)
-                retrieved_doc_ids.append(doc_id)
-            
-            relevant_retrieved = []
-            for j, (title, doc_id) in enumerate(zip(retrieved_titles, retrieved_doc_ids)):
-                title_lower = title.lower()
-                doc_id_lower = doc_id.lower()
-                
-                for pattern in expected_doc_patterns:
-                    if pattern.lower() in title_lower or pattern.lower() in doc_id_lower:
-                        relevant_retrieved.append(j)
-                        break
-            
-            num_relevant_retrieved = len(relevant_retrieved)
-            num_expected = len(expected_docs)
-            
-            precision_at_k = num_relevant_retrieved / k if k > 0 else 0.0
-            
-            total_precision_at_k += precision_at_k
-            
-            logger.info(f"Relevant docs found: {num_relevant_retrieved}/{num_expected}")
-            logger.info(f"Precision@{k}: {precision_at_k:.3f}")
-            
-        
-        avg_precision_at_k = total_precision_at_k / total_queries
-        
-        logger.info("\n" + "="*60)
-        logger.info("EVALUATION RESULTS")
-        logger.info("="*60)
-        logger.info(f"Total queries evaluated: {total_queries}")
-        logger.info(f"Average Precision@{k}: {avg_precision_at_k:.3f}")
-        logger.info("="*60)
+        k_array = args.k_array
+        results = evaluate_rag_system(index_path, args.test_queries_file, args.max_test_queries, k_array) 
+        save_results(results, Path(args.output_file))
     
     logger.info("=" * 60)
 

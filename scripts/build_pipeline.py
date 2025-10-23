@@ -9,15 +9,12 @@ import argparse
 import json
 from pathlib import Path
 
-# Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import logging
 from src.ingest.langchain_ingest import (
     LangChainIngest,
-    load_medrag_data,
-    process_guidelines,
     list_available_datasets
 )
 from src.retriever.faiss_builder import build_faiss_index, build_faiss_index_fast, load_faiss_index
@@ -46,6 +43,10 @@ def parse_args():
                        help="Chunk size for text processing")
     parser.add_argument("--chunk-overlap", type=int, default=60,
                        help="Chunk overlap for text processing")
+    parser.add_argument("--separators", type=list, default=["\n\n", "\n", " ", ""],
+                       help="Separators for text processing")
+    parser.add_argument("--text-splitter", type=str, default="RecursiveCharacterTextSplitter",
+                       help="Text splitter to use")
     
     # Model options
     parser.add_argument("--embedding-model", type=str, default="thenlper/gte-small",
@@ -104,15 +105,21 @@ def main():
     if existing_datasets:
         logger.info("Existing datasets:")
         for name, count in existing_datasets.items():
-            logger.info(f"  📂 {name}: {count:,} documents")
+            logger.info(f"{name}: {count:,} documents")
     else:
         logger.info("No existing datasets found")
     
     # Step 2: Load MedRAG datasets using LangChain
     logger.info("Step 2: Loading MedRAG datasets using LangChain...")
     logger.info(f"Using document limits: PubMed={args.pubmed_docs:,}, Textbooks={args.textbook_docs:,}")
+
+    ingest = LangChainIngest(
+        chunk_size=args.chunk_size,
+        chunk_overlap=args.chunk_overlap,
+        separators=args.separators, 
+    )
     
-    loaded = load_medrag_data(
+    loaded = ingest.load_all_medrag_data_to_disk(
         corpus_dir=Path("data/corpus_raw"),
         pubmed_docs=args.pubmed_docs,
         textbook_docs=args.textbook_docs,
@@ -123,15 +130,17 @@ def main():
     for name, path in loaded.items():
         logger.info(f"{name}: {path}")
     
-    # Step 3: Process guidelines using LangChain if not exists
-    guidelines_path = Path("data/corpus_norm/guidelines_processed")
+    # Step 3: Process guidelines using LangChain if not processed
+    if len(ingest.load_pdfs_from_directory(Path("data/guidelines"))) < 6:
+        logger.error("Please download the guidelines to data/guidelines folder")
+        exit(1)
+    
+    logger.info("Step 3: Processing guidelines using LangChain...")
+    guidelines_path = Path("data/corpus_norm/guidelines_processed/guidelines_processed.arrow")
     if not guidelines_path.exists():
-        logger.info("Step 3: Processing guidelines using LangChain...")
-        guidelines_path = process_guidelines(
+        guidelines_path = ingest.process_guidelines_to_disk(
             guidelines_dir=Path("data/guidelines"),
             output_dir=Path("data/corpus_norm"),
-            chunk_size=args.chunk_size,
-            chunk_overlap=args.chunk_overlap
         )
         logger.info(f"Guidelines processed and saved to: {guidelines_path}")
     else:
@@ -187,23 +196,6 @@ def main():
                 
                 retrieved_titles.append(title)
                 retrieved_doc_ids.append(doc_id)
-
-            expected_doc_patterns = []
-            for expected_doc in expected_docs:
-                if expected_doc == "idsa_clinical_guideline_covid19":
-                    expected_doc_patterns.extend(["idsa", "covid", "covid19", "clinical_guideline"])
-                elif expected_doc == "ada_soc_diabetes_2024":
-                    expected_doc_patterns.extend(["ada", "diabetes", "soc_diabetes"])
-                elif expected_doc == "aha_stroke_2021":
-                    expected_doc_patterns.extend(["aha", "stroke", "stroke_2021"])
-                elif expected_doc == "aha_acc_afib":
-                    expected_doc_patterns.extend(["aha", "acc", "afib", "atrial"])
-                elif expected_doc == "acc_aha_hf":
-                    expected_doc_patterns.extend(["acc", "aha", "hf", "heart_failure"])
-                elif expected_doc == "surviving_sepsis":
-                    expected_doc_patterns.extend(["surviving", "sepsis", "septic"])
-                else:
-                    expected_doc_patterns.append(expected_doc.lower())
             
             relevant_retrieved = []
             for j, (title, doc_id) in enumerate(zip(retrieved_titles, retrieved_doc_ids)):

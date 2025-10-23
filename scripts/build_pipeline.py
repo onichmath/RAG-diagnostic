@@ -9,7 +9,6 @@ import argparse
 import json
 from pathlib import Path
 
-# Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -46,6 +45,10 @@ def parse_args():
                        help="Chunk size for text processing")
     parser.add_argument("--chunk-overlap", type=int, default=60,
                        help="Chunk overlap for text processing")
+    parser.add_argument("--separators", type=list, default=["\n\n", "\n", " ", ""],
+                       help="Separators for text processing")
+    parser.add_argument("--text-splitter", type=str, default="RecursiveCharacterTextSplitter",
+                       help="Text splitter to use")
     
     # Model options
     parser.add_argument("--embedding-model", type=str, default="thenlper/gte-small",
@@ -95,7 +98,7 @@ def main():
     """Run the complete pipeline using LangChain."""
     args = parse_args()
     
-    logger.info("🚀 Starting RAG Diagnostic Pipeline (LangChain)")
+    logger.info("Starting RAG Diagnostic Pipeline (LangChain)")
     logger.info("=" * 60)
     
     # Step 1: Check existing datasets
@@ -104,15 +107,20 @@ def main():
     if existing_datasets:
         logger.info("Existing datasets:")
         for name, count in existing_datasets.items():
-            logger.info(f"  📂 {name}: {count:,} documents")
+            logger.info(f"{name}: {count:,} documents")
     else:
         logger.info("No existing datasets found")
     
     # Step 2: Load MedRAG datasets using LangChain
     logger.info("Step 2: Loading MedRAG datasets using LangChain...")
     logger.info(f"Using document limits: PubMed={args.pubmed_docs:,}, Textbooks={args.textbook_docs:,}")
-    
-    loaded = load_medrag_data(
+
+    ingest = LangChainIngest(
+        chunk_size=args.chunk_size,
+        chunk_overlap=args.chunk_overlap,
+        separators=args.separators, 
+    )
+    loaded = ingest.load_all_medrag_data_to_disk(
         corpus_dir=Path("data/corpus_raw"),
         pubmed_docs=args.pubmed_docs,
         textbook_docs=args.textbook_docs,
@@ -121,13 +129,16 @@ def main():
     
     logger.info("Loaded datasets:")
     for name, path in loaded.items():
-        logger.info(f"  📁 {name}: {path}")
+        logger.info(f"  {name}: {path}")
     
-    # Step 3: Process guidelines using LangChain if not exists
+    # Step 3: Process guidelines using LangChain if not processed
+    if len(ingest.load_pdfs_from_directory(Path("data/guidelines"))) < 6:
+        logger.info("Step 2: Downloading guidelines...")
+    
     guidelines_path = Path("data/corpus_norm/guidelines_processed")
     if not guidelines_path.exists():
         logger.info("Step 3: Processing guidelines using LangChain...")
-        guidelines_path = process_guidelines(
+        guidelines_path = ingest.process_guidelines_to_disk(
             guidelines_dir=Path("data/guidelines"),
             output_dir=Path("data/corpus_norm"),
             chunk_size=args.chunk_size,

@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Union
 import logging
 
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, TextSplitter
 from langchain_core.documents import Document
 from datasets import Dataset, load_dataset, load_from_disk
 import pandas as pd
@@ -18,12 +18,11 @@ logger = logging.getLogger(__name__)
 
 class LangChainIngest:
     """Simplified ingest using LangChain document loaders and splitters."""
-    
     def __init__(
         self,
         chunk_size: int = 300,
         chunk_overlap: int = 60,
-        separators: Optional[List[str]] = None
+        separators: list = ["\n\n", "\n", " ", ""],
     ):
         """
         Initialize LangChain ingest.
@@ -36,12 +35,11 @@ class LangChainIngest:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.separators = separators or ["\n\n", "\n", " ", ""]
-        
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            separators=separators,
             length_function=len,
-            separators=self.separators
         )
     
     def load_pdfs_from_directory(self, directory: Path) -> List[Document]:
@@ -68,29 +66,41 @@ class LangChainIngest:
         
         return documents
     
-    def load_text_files_from_directory(self, directory: Path) -> List[Document]:
+    def download_guidelines_to_disk(self, guidelines_dir: Path) -> List[Document]:
         """
-        Load all text files from a directory using LangChain.
+        Download guidelines from the internet.
         
         Args:
-            directory: Directory containing text files
+            guidelines_dir: Directory to save guidelines
         
         Returns:
             List of LangChain Document objects
         """
-        logger.info(f"Loading text files from {directory}")
+        URLs = ["https://www.cardioschool.org/uploads/guidelines/heart%20failure/aha-acc/full.pdf",
+                ""]
+    # def load_text_files_from_directory(self, directory: Path) -> List[Document]:
+    #     """
+    #     Load all text files from a directory using LangChain.
         
-        loader = DirectoryLoader(
-            str(directory),
-            glob="**/*.txt",
-            loader_cls=TextLoader,
-            show_progress=True
-        )
+    #     Args:
+    #         directory: Directory containing text files
         
-        documents = loader.load()
-        logger.info(f"Loaded {len(documents)} text documents")
+    #     Returns:
+    #         List of LangChain Document objects
+    #     """
+    #     logger.info(f"Loading text files from {directory}")
         
-        return documents
+    #     loader = DirectoryLoader(
+    #         str(directory),
+    #         glob="**/*.txt",
+    #         loader_cls=TextLoader,
+    #         show_progress=True
+    #     )
+        
+    #     documents = loader.load()
+    #     logger.info(f"Loaded {len(documents)} text documents")
+        
+    #     return documents
     
     def chunk_documents(self, documents: List[Document], metadata: Optional[Dict[str, Any]] = None) -> List[Document]:
         """
@@ -147,7 +157,7 @@ class LangChainIngest:
         
         return medrag_docs
     
-    def process_guidelines(
+    def process_guidelines_to_disk(
         self,
         guidelines_dir: Path,
         output_dir: Path,
@@ -186,7 +196,7 @@ class LangChainIngest:
         logger.info(f"Saved {len(medrag_docs)} guideline chunks to {output_path}")
         return output_path
     
-    def load_huggingface_dataset(
+    def load_huggingface_dataset_to_disk(
         self,
         dataset_name: str,
         output_dir: Path,
@@ -211,12 +221,12 @@ class LangChainIngest:
         if not force_download and output_path.exists():
             try:
                 dataset = load_from_disk(str(output_path))
-                logger.info(f"✅ Found existing dataset at {output_path} ({len(dataset)} documents)")
+                logger.info(f"Found existing dataset at {output_path} ({len(dataset)} documents)")
                 return output_path
             except Exception as e:
-                logger.warning(f"⚠️ Found directory {output_path} but it's not a valid dataset: {e}")
+                logger.warning(f"Found directory {output_path} but it's not a valid dataset: {e}")
         
-        logger.info(f"📥 Loading {max_documents:,} documents from {dataset_name} dataset...")
+        logger.info(f"Loading {max_documents:,} documents from {dataset_name} dataset...")
         
         dataset = load_dataset(dataset_name, split="train", streaming=True)
         
@@ -236,10 +246,10 @@ class LangChainIngest:
         output_dir.mkdir(parents=True, exist_ok=True)
         regular_dataset.save_to_disk(str(output_path))
         
-        logger.info(f"✅ Saved {len(regular_dataset):,} documents to {output_path}")
+        logger.info(f"Saved {len(regular_dataset):,} documents to {output_path}")
         return output_path
     
-    def load_all_medrag_data(
+    def load_all_medrag_data_to_disk(
         self,
         corpus_dir: Path = Path("data/corpus_raw"),
         pubmed_docs: int = 100000,
@@ -261,9 +271,9 @@ class LangChainIngest:
         corpus_dir.mkdir(parents=True, exist_ok=True)
         loaded = {}
         
-        logger.info("🔄 Loading MedRAG datasets...")
+        logger.info("Loading MedRAG datasets...")
         
-        pubmed_path = self.load_huggingface_dataset(
+        pubmed_path = self.load_huggingface_dataset_to_disk(
             "MedRAG/pubmed",
             corpus_dir,
             max_documents=pubmed_docs,
@@ -271,7 +281,7 @@ class LangChainIngest:
         )
         loaded["pubmed"] = pubmed_path
         
-        textbook_path = self.load_huggingface_dataset(
+        textbook_path = self.load_huggingface_dataset_to_disk(
             "MedRAG/textbooks",
             corpus_dir,
             max_documents=textbook_docs,
@@ -279,57 +289,57 @@ class LangChainIngest:
         )
         loaded["textbooks"] = textbook_path
         
-        logger.info(f"✅ Loaded {len(loaded)} datasets from {corpus_dir}")
+        logger.info(f"Loaded {len(loaded)} datasets from {corpus_dir}")
         return loaded
 
 
-def process_guidelines(
-    guidelines_dir: Path = Path("data/guidelines"),
-    output_dir: Path = Path("data/corpus_norm"),
-    chunk_size: int = 300,
-    chunk_overlap: int = 60
-) -> Path:
-    """
-    Simple function to process guidelines using LangChain.
+# def process_guidelines(
+#     guidelines_dir: Path = Path("data/guidelines"),
+#     output_dir: Path = Path("data/corpus_norm"),
+#     chunk_size: int = 300,
+#     chunk_overlap: int = 60
+# ) -> Path:
+#     """
+#     Simple function to process guidelines using LangChain.
     
-    Args:
-        guidelines_dir: Directory containing guideline PDFs
-        output_dir: Directory to save processed dataset
-        chunk_size: Target chunk size in characters
-        chunk_overlap: Overlap between chunks
+#     Args:
+#         guidelines_dir: Directory containing guideline PDFs
+#         output_dir: Directory to save processed dataset
+#         chunk_size: Target chunk size in characters
+#         chunk_overlap: Overlap between chunks
     
-    Returns:
-        Path to saved dataset
-    """
-    ingest = LangChainIngest(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    return ingest.process_guidelines(guidelines_dir, output_dir)
+#     Returns:
+#         Path to saved dataset
+#     """
+#     ingest = LangChainIngest(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+#     return ingest.process_guidelines(guidelines_dir, output_dir)
 
 
-def load_medrag_data(
-    corpus_dir: Path = Path("data/corpus_raw"),
-    pubmed_docs: int = 100000,
-    textbook_docs: int = 10000,
-    force_download: bool = False
-) -> Dict[str, Path]:
-    """
-    Simple function to load MedRAG datasets.
+# def load_medrag_data(
+#     corpus_dir: Path = Path("data/corpus_raw"),
+#     pubmed_docs: int = 100000,
+#     textbook_docs: int = 10000,
+#     force_download: bool = False
+# ) -> Dict[str, Path]:
+#     """
+#     Simple function to load MedRAG datasets.
     
-    Args:
-        corpus_dir: Directory to save datasets
-        pubmed_docs: Number of PubMed documents to load
-        textbook_docs: Number of textbook documents to load
-        force_download: Force download even if local copies exist
+#     Args:
+#         corpus_dir: Directory to save datasets
+#         pubmed_docs: Number of PubMed documents to load
+#         textbook_docs: Number of textbook documents to load
+#         force_download: Force download even if local copies exist
     
-    Returns:
-        Dict with paths to loaded datasets
-    """
-    ingest = LangChainIngest()
-    return ingest.load_all_medrag_data(
-        corpus_dir=corpus_dir,
-        pubmed_docs=pubmed_docs,
-        textbook_docs=textbook_docs,
-        force_download=force_download
-    )
+#     Returns:
+#         Dict with paths to loaded datasets
+#     """
+#     ingest = LangChainIngest()
+#     return ingest.load_all_medrag_data(
+#         corpus_dir=corpus_dir,
+#         pubmed_docs=pubmed_docs,
+#         textbook_docs=textbook_docs,
+#         force_download=force_download
+#     )
 
 
 def list_available_datasets(corpus_dir: Path = Path("data/corpus_raw")) -> Dict[str, int]:

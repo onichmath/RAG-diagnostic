@@ -51,12 +51,12 @@ conda env create -f env.yml
 ```bash
 # Download clinical guidelines to data/guidelines/
 # Required files:
-# - "Surviving sepsis campaign: international guidelines for management of sepsis and septic shock 2021"
-# - "Introduction and Methodology: Standards of Care in Diabetes—2024"
-# - "2022 AHA/ACC/HFSA Guideline for the Management of Heart Failure: A Report of the American College of Cardiology/American Heart Association Joint Committee on Clinical Practice Guidelines"
-# - "2019 AHA/ACC/HRS Focused Update of the 2014 AHA/ACC/HRS Guideline for the Management of Patients With Atrial Fibrillation"
-# - "2021 Guideline for the Prevention of Stroke in Patients With Stroke and Transient Ischemic Attack"
-# - "2025 Clinical Practice Guideline Update by the Infectious Diseases Society of America on the Treatment and Management of COVID-19: Infliximab"
+# - "Surviving sepsis campaign: international guidelines for management of sepsis and septic shock 2021" - https://link.springer.com/article/10.1007/s00134-021-06506-y
+# - "Introduction and Methodology: Standards of Care in Diabetes—2024" - https://diabetesjournals.org/care/article/47/Supplement_1/S1/153952/Introduction-and-Methodology-Standards-of-Care-in
+# - "2022 AHA/ACC/HFSA Guideline for the Management of Heart Failure: A Report of the American College of Cardiology/American Heart Association Joint Committee on Clinical Practice Guidelines" - https://www.ahajournals.org/doi/10.1161/CIR.0000000000001063
+# - "2019 AHA/ACC/HRS Focused Update of the 2014 AHA/ACC/HRS Guideline for the Management of Patients With Atrial Fibrillation" - https://www.ahajournals.org/doi/10.1161/CIR.0000000000000665
+# - "2021 Guideline for the Prevention of Stroke in Patients With Stroke and Transient Ischemic Attack" - https://www.ahajournals.org/doi/10.1161/STR.0000000000000375
+# - "2025 Clinical Practice Guideline Update by the Infectious Diseases Society of America on the Treatment and Management of COVID-19: Infliximab" - https://pubmed.ncbi.nlm.nih.gov/40831386/
 ```
 
 ### 3. Run the Pipeline

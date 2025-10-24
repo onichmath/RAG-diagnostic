@@ -17,7 +17,7 @@ from src.ingest.langchain_ingest import (
     list_available_datasets
 )
 from src.retriever.faiss_builder import build_faiss_index, build_faiss_index_fast, load_faiss_index
-from src.eval.eval import evaluate_rag_system, save_results
+from src.eval.eval import evaluate_rag_system, save_results, graph_results
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,8 +35,8 @@ def parse_args():
                        help="Number of PubMed documents to load")
     parser.add_argument("--textbook-docs", type=int, default=50000,
                        help="Number of textbook documents to load")
-    parser.add_argument("--force-download", action="store_true",
-                       help="Force download even if local copies exist")
+    parser.add_argument("--force-download", action="store_true", default=False,
+                       help="Force download even if local copies exist (default: False)")
     
     # Processing options
     parser.add_argument("--chunk-size", type=int, default=300,
@@ -53,8 +53,8 @@ def parse_args():
                        help="HuggingFace embedding model to use")
     
     # FAISS optimization options
-    parser.add_argument("--use-fast-faiss", action="store_true",
-                       help="Use optimized FAISS index building")
+    parser.add_argument("--use-fast-faiss", action="store_true", default=True,
+                       help="Use optimized FAISS index building (default: True)")
     parser.add_argument("--faiss-batch-size", type=int, default=2000,
                        help="Batch size for FAISS index building")
     parser.add_argument("--faiss-index-type", type=str, default="IVF",
@@ -69,12 +69,16 @@ def parse_args():
                        help="Path to JSON file containing test queries")
     parser.add_argument("--max-test-queries", type=int, default=10,
                        help="Maximum number of test queries to run")
-    parser.add_argument("--skip-test", action="store_true",
-                       help="Skip retrieval testing")
+    parser.add_argument("--skip-test", action="store_true", default=False,
+                       help="Skip retrieval testing (default: False)")
     parser.add_argument("--output-file", type=str, default="data/FAISS_evaluation_results.json",
                        help="Path to JSON file containing evaluation results") 
+    parser.add_argument("--graph-file", type=str, default="data/FAISS_evaluation_results.png",
+                       help="Path to PNG file containing evaluation results graph")
     parser.add_argument("--k-array", type=list, default=[5, 10, 20, 50, 100],
                        help="Array of k values to evaluate")
+    parser.add_argument("--save-results", action="store_false", default=True,
+                       help="Save evaluation results to a JSON file (default: True)")
     
     return parser.parse_args()
 
@@ -156,9 +160,11 @@ def main():
     # Step 5: Test retrieval (optional)
     if not args.skip_test:
         logger.info("Step 5: Testing retrieval...")
-        k_array = args.k_array
-        results = evaluate_rag_system(index_path, args.test_queries_file, args.max_test_queries, k_array) 
-        save_results(results, Path(args.output_file))
+        results = evaluate_rag_system(index_path, args.test_queries_file, args.max_test_queries, args.k_array)
+        
+        if args.save_results:
+            save_results(results, Path(args.output_file))
+            graph_results(results, Path(args.graph_file))
     
     logger.info("=" * 60)
 

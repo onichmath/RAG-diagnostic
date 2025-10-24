@@ -1,7 +1,13 @@
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 from src.retriever.faiss_builder import load_faiss_index
 from time import time
 import json
+import math
+from matplotlib import pyplot as plt
+import seaborn as sns
 
 def load_test_queries(queries_file: Path, max_queries: int):
     """
@@ -39,13 +45,7 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             relevance_scores = [] 
             
             for i, result in enumerate(search_results):
-                is_relevant = False
-                
-                if result.metadata.get('source') == expected_source:
-                    is_relevant = True
-                    break
-                
-                if is_relevant:
+                if (result.metadata.get('source') == expected_source):
                     relevant_found += 1
                     relevant_positions.append(i + 1)
                     relevance_scores.append(1.0)
@@ -55,16 +55,18 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             precision_at_k = relevant_found / k if k > 0 else 0.0
             
             def dcg_at_k(relevance_scores, k):
-                """Calculate DCG@k"""
+                """Calculate DCG@k with proper log scaling"""
                 dcg = 0.0
                 for i in range(min(k, len(relevance_scores))):
-                    dcg += relevance_scores[i] / (i + 1) if relevance_scores[i] > 0 else 0.0
+                    if relevance_scores[i] > 0:
+                        dcg += relevance_scores[i] / math.log2(i + 2)
                 return dcg
             
             def idcg_at_k(relevance_scores, k):
                 """Calculate IDCG@k (ideal DCG)"""
-                sorted_scores = sorted(relevance_scores, reverse=True)
-                return dcg_at_k(sorted_scores, k)
+                total_relevant = sum(relevance_scores)
+                ideal_scores = [1.0] * min(int(total_relevant), k) + [0.0] * max(0, k - int(total_relevant))
+                return dcg_at_k(ideal_scores, k)
             
             dcg = dcg_at_k(relevance_scores, k)
             idcg = idcg_at_k(relevance_scores, k)
@@ -84,7 +86,6 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             "throughput_qps": throughput,
             "total_queries": total_queries
         }
-    
     return results
 
 def save_results(results: dict, output_file: Path):
@@ -93,3 +94,31 @@ def save_results(results: dict, output_file: Path):
     """
     with open(output_file, 'w') as f:
         json.dump(results, f)
+        
+        
+def graph_results(results: dict, graph_file: Path):
+    """
+    Graph the results.
+    """
+    # x-axis is k, y-axis is the metric
+    x_axis = list(results.keys())
+    y_axis = [result['avg_precision_at_k'] for result in results.values()]
+    y_axis = [result['avg_ndcg_at_k'] for result in results.values()]
+    plt.xlabel('k')
+    plt.ylabel('Metric')
+    plt.title('Evaluation Results')
+    plt.show()
+    
+def load_results(results_file: Path):
+    """
+    Load the results from a JSON file.
+    """
+    with open(results_file, 'r') as f:
+        return json.load(f)
+    
+if __name__ == "__main__":
+    results = load_results(Path("data/FAISS_evaluation_results.json"))
+    print(results)
+    exit()
+    graph_results(results, Path("data/FAISS_evaluation_results.png"))
+    exit()

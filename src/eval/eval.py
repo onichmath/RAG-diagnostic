@@ -23,6 +23,10 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
     """
     test_queries = load_test_queries(queries_file, max_queries)
     vectorstore = load_faiss_index(index_path) 
+    # Warm start 
+    for i in range(1):
+        vectorstore.similarity_search("test", k=10)
+    
     results = {}
     
     for k in k_array:
@@ -98,16 +102,10 @@ def save_results(results: dict, output_file: Path):
         
 def graph_results(results: dict, graph_file: Path):
     """
-    Graph the results.
+    Graph the results with precision@k and NDCG@k.
     """
-    # x-axis is k, y-axis is the metric
-    x_axis = list(results.keys())
-    y_axis = [result['avg_precision_at_k'] for result in results.values()]
-    y_axis = [result['avg_ndcg_at_k'] for result in results.values()]
-    plt.xlabel('k')
-    plt.ylabel('Metric')
-    plt.title('Evaluation Results')
-    plt.show()
+    # TODO 
+    raise NotImplementedError("Graphing results is not implemented yet")
     
 def load_results(results_file: Path):
     """
@@ -118,7 +116,5 @@ def load_results(results_file: Path):
     
 if __name__ == "__main__":
     results = load_results(Path("data/FAISS_evaluation_results.json"))
-    print(results)
-    exit()
     graph_results(results, Path("data/FAISS_evaluation_results.png"))
     exit()

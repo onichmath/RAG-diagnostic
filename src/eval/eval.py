@@ -58,7 +58,7 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             query_text = query_data.get('query_text', '')
             expected_gold_docs = query_data.get('expected_gold_docs', [])
             
-            #expected_source = "guideline"
+            expected_source = "guideline"
             
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
@@ -73,9 +73,10 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
                 result_title = result.metadata.get('title', '').lower()
                 expected_doc_patterns = get_expected_doc_patterns(expected_gold_docs) 
                 pattern_match = any(pattern in result_title for pattern in expected_doc_patterns)
+                result_source = result.metadata.get('source', '').lower()
                 
                 #if (result.metadata.get('source') == expected_source):
-                if pattern_match:
+                if pattern_match and result_source == expected_source:
                     relevant_found += 1
                     relevant_positions.append(i + 1)
                     relevance_scores.append(1.0)

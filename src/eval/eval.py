@@ -17,6 +17,25 @@ def load_test_queries(queries_file: Path, max_queries: int):
         data = json.load(f)
     return data.get('queries', [])[:max_queries]
 
+def get_expected_doc_patterns(expected_docs: list):
+    expected_doc_patterns = []
+    for expected_doc in expected_docs:
+        if expected_doc == "idsa_clinical_guideline_covid19":
+            expected_doc_patterns.extend(["idsa", "covid", "covid19", "clinical_guideline"])
+        elif expected_doc == "ada_soc_diabetes_2024":
+            expected_doc_patterns.extend(["ada", "diabetes", "soc_diabetes"])
+        elif expected_doc == "aha_stroke_2021":
+            expected_doc_patterns.extend(["aha", "stroke", "stroke_2021"])
+        elif expected_doc == "aha_acc_afib":
+            expected_doc_patterns.extend(["aha", "acc", "afib", "atrial"])
+        elif expected_doc == "acc_aha_hf":
+            expected_doc_patterns.extend(["acc", "aha", "hf", "heart_failure"])
+        elif expected_doc == "surviving_sepsis":
+            expected_doc_patterns.extend(["surviving", "sepsis", "septic"])
+        else:
+            expected_doc_patterns.append(expected_doc.lower())
+    return expected_doc_patterns
+
 def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list):
     """
     Evaluate the RAG system using the given index and queries.
@@ -37,7 +56,9 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
         
         for i, query_data in enumerate(test_queries, 1):
             query_text = query_data.get('query_text', '')
-            expected_source = "guideline"
+            expected_gold_docs = query_data.get('expected_gold_docs', [])
+            
+            #expected_source = "guideline"
             
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
@@ -49,7 +70,12 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             relevance_scores = [] 
             
             for i, result in enumerate(search_results):
-                if (result.metadata.get('source') == expected_source):
+                result_title = result.metadata.get('title', '').lower()
+                expected_doc_patterns = get_expected_doc_patterns(expected_gold_docs) 
+                pattern_match = any(pattern in result_title for pattern in expected_doc_patterns)
+                
+                #if (result.metadata.get('source') == expected_source):
+                if pattern_match:
                     relevant_found += 1
                     relevant_positions.append(i + 1)
                     relevance_scores.append(1.0)

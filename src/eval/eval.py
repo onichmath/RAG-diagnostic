@@ -117,6 +117,7 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             "throughput_qps": throughput,
             "total_queries": total_queries
         }
+    results["estimated_memory_usage_MB"] = vectorstore.index.ntotal * vectorstore.index.d * 4 / (1024 * 1024)
     return results
 
 def save_results(results: dict, output_file: Path):

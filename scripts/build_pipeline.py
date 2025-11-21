@@ -53,7 +53,7 @@ def parse_args():
                        help="HuggingFace embedding model to use")
     
     # FAISS optimization options
-    parser.add_argument("--use-fast-faiss", action="store_true", default=True,
+    parser.add_argument("--use-fast-faiss", action="store_true", default=False,
                        help="Use optimized FAISS index building (default: True)")
     parser.add_argument("--faiss-batch-size", type=int, default=2000,
                        help="Batch size for FAISS index building")
@@ -79,6 +79,11 @@ def parse_args():
                        help="Array of k values to evaluate")
     parser.add_argument("--save-results", action="store_false", default=True,
                        help="Save evaluation results to a JSON file (default: True)")
+
+    # Filter options
+    parser.add_argument("--filter-pubmed", action="store_true", default=False,
+                       help="Apply heuristic filtering on PubMed chunks before indexing")
+
     
     return parser.parse_args()
 
@@ -140,21 +145,40 @@ def main():
         logger.info(f"Guidelines already processed and saved to: {guidelines_path}")
     
     # Step 4: Build FAISS index if not exists
+        # Step 4: Build FAISS index if not exists
     index_path = Path("data/indices/faiss_index")
     if not index_path.exists():
         logger.info("Step 4: Building FAISS index...")
         logger.info(f"Using embedding model: {args.embedding_model}")
-        index_path = build_faiss_index(
-            corpus_dir=Path("data/corpus_raw"),
-            corpus_norm_dir=guidelines_path,
-            output_dir=index_path,
-            embedding_model=args.embedding_model,
-            batch_size=args.faiss_batch_size,
-            use_gpu=args.use_gpu
-        )
+        logger.info(f"Using fast FAISS: {args.use_fast_faiss}")
+        logger.info(f"Filter PubMed: {args.filter_pubmed}")
+
+        if args.use_fast_faiss:
+            index_path = build_faiss_index_fast(
+                corpus_dir=Path("data/corpus_raw"),
+                corpus_norm_dir=guidelines_path,
+                output_dir=index_path,
+                embedding_model=args.embedding_model,
+                batch_size=args.faiss_batch_size,
+                use_gpu=args.use_gpu,
+                faiss_index_type=args.faiss_index_type,
+                filter_pubmed=args.filter_pubmed,
+            )
+        else:
+            index_path = build_faiss_index(
+                corpus_dir=Path("data/corpus_raw"),
+                corpus_norm_dir=guidelines_path,
+                output_dir=index_path,
+                embedding_model=args.embedding_model,
+                batch_size=args.faiss_batch_size,
+                use_gpu=args.use_gpu,
+                filter_pubmed=args.filter_pubmed,
+            )
+
         logger.info(f"FAISS index built and saved to: {index_path}")
     else:
         logger.info(f"FAISS index already exists at: {index_path}")
+
     
     
     # Step 5: Test retrieval (optional)
@@ -164,7 +188,7 @@ def main():
         
         if args.save_results:
             save_results(results, Path(args.output_file))
-            graph_results(results, Path(args.graph_file))
+            #graph_results(results, Path(args.graph_file))
     
     logger.info("=" * 60)
 

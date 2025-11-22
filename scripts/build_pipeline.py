@@ -84,6 +84,13 @@ def parse_args():
     parser.add_argument("--filter-pubmed", action="store_true", default=False,
                        help="Apply heuristic filtering on PubMed chunks before indexing")
 
+    parser.add_argument("--use-llm-reranker", action="store_true", default=False,
+                       help="Use local LLM title-based reranker")
+
+    parser.add_argument("--llm-model", type=str, default="local", 
+                       help="Ignored for local reranking; kept for compatibility")
+
+
     
     return parser.parse_args()
 
@@ -184,7 +191,10 @@ def main():
     # Step 5: Test retrieval (optional)
     if not args.skip_test:
         logger.info("Step 5: Testing retrieval...")
-        results = evaluate_rag_system(index_path, args.test_queries_file, args.max_test_queries, args.k_array)
+        # results = evaluate_rag_system(index_path, args.test_queries_file, args.max_test_queries, args.k_array)
+        results = evaluate_rag_system(index_path=index_path, queries_file=args.test_queries_file, max_queries=args.max_test_queries, 
+                                      k_array=args.k_array, use_llm_reranker=args.use_llm_reranker, llm_model=args.llm_model)
+
         
         if args.save_results:
             save_results(results, Path(args.output_file))

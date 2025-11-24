@@ -64,7 +64,7 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             search_results = vectorstore.similarity_search(query_text, k=k)
             time_end = time()
             latency = time_end - time_start
-                                    
+             
             relevant_found = 0
             relevant_positions = []
             relevance_scores = [] 

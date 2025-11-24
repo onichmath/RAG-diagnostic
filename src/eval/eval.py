@@ -3,6 +3,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.retriever.faiss_builder import load_faiss_index
+from src.reranker.llm_title_rerank import rerank_by_title_llm
+
 from time import time
 import json
 import math
@@ -36,7 +38,8 @@ def get_expected_doc_patterns(expected_docs: list):
             expected_doc_patterns.append(expected_doc.lower())
     return expected_doc_patterns
 
-def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list):
+# def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list):
+def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list, use_llm_reranker: bool = False, llm_model: str = "local"):
     """
     Evaluate the RAG system using the given index and queries.
     """
@@ -62,6 +65,13 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
+            # Title-Based Local LLM Reranker
+            if use_llm_reranker:
+              search_results = rerank_by_title_llm(
+                query=query_text,
+                docs=search_results,
+                model_name=llm_model,
+              )
             time_end = time()
             latency = time_end - time_start
              

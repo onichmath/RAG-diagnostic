@@ -89,6 +89,13 @@ def parse_args():
 
     parser.add_argument("--llm-model", type=str, default="local", 
                        help="Ignored for local reranking; kept for compatibility")
+    
+    # colber rerank options
+    parser.add_argument("--use-colbert-reranker", action="store_true", default=False,
+                       help="Use ColBERT-style Late Interaction reranker")
+    
+    parser.add_argument("--colbert-model", type=str, default="bert-base-uncased",
+                       help="HuggingFace model for ColBERT reranker")
 
 
     
@@ -163,7 +170,7 @@ def main():
         if args.use_fast_faiss:
             index_path = build_faiss_index_fast(
                 corpus_dir=Path("data/corpus_raw"),
-                corpus_norm_dir=guidelines_path,
+                corpus_norm_dir=Path("data/corpus_norm"),
                 output_dir=index_path,
                 embedding_model=args.embedding_model,
                 batch_size=args.faiss_batch_size,
@@ -174,7 +181,7 @@ def main():
         else:
             index_path = build_faiss_index(
                 corpus_dir=Path("data/corpus_raw"),
-                corpus_norm_dir=guidelines_path,
+                corpus_norm_dir=Path("data/corpus_norm"),
                 output_dir=index_path,
                 embedding_model=args.embedding_model,
                 batch_size=args.faiss_batch_size,
@@ -192,8 +199,20 @@ def main():
     if not args.skip_test:
         logger.info("Step 5: Testing retrieval...")
         # results = evaluate_rag_system(index_path, args.test_queries_file, args.max_test_queries, args.k_array)
-        results = evaluate_rag_system(index_path=index_path, queries_file=args.test_queries_file, max_queries=args.max_test_queries, 
-                                      k_array=args.k_array, use_llm_reranker=args.use_llm_reranker, llm_model=args.llm_model)
+        # results = evaluate_rag_system(index_path=index_path, queries_file=args.test_queries_file, max_queries=args.max_test_queries, 
+        #                               k_array=args.k_array, use_llm_reranker=args.use_llm_reranker, llm_model=args.llm_model)
+        results = evaluate_rag_system(
+            index_path=index_path, 
+            queries_file=args.test_queries_file, 
+            max_queries=args.max_test_queries, 
+            k_array=args.k_array, 
+            
+            use_llm_reranker=args.use_llm_reranker, 
+            llm_model=args.llm_model,
+            
+            use_colbert_reranker=args.use_colbert_reranker,
+            colbert_model=args.colbert_model
+        )
 
         
         if args.save_results:

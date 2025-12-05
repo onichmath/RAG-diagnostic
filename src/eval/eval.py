@@ -4,6 +4,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.retriever.faiss_builder import load_faiss_index
 from src.reranker.llm_title_rerank import rerank_by_title_llm
+from src.reranker.colbert_rerank import rerank_with_colbert
 
 from time import time
 import json
@@ -39,7 +40,8 @@ def get_expected_doc_patterns(expected_docs: list):
     return expected_doc_patterns
 
 # def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list):
-def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list, use_llm_reranker: bool = False, llm_model: str = "local"):
+def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list, use_llm_reranker: bool = False, llm_model: str = "local", use_colbert_reranker: bool = False,
+    colbert_model: str = "bert-base-uncased"):
     """
     Evaluate the RAG system using the given index and queries.
     """
@@ -65,6 +67,16 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
+            # ColBERT Reranker
+            if use_colbert_reranker:
+                # We rerank whatever FAISS found
+                search_results = rerank_with_colbert(
+                    query=query_text,
+                    docs=search_results,
+                    model_name=colbert_model,
+                    top_k=k # Return the same amount, just reordered
+                )
+
             # Title-Based Local LLM Reranker
             if use_llm_reranker:
               search_results = rerank_by_title_llm(

@@ -170,6 +170,7 @@ def main():
         if args.use_fast_faiss:
             index_path = build_faiss_index_fast(
                 corpus_dir=Path("data/corpus_raw"),
+                # corpus_norm_dir=guidelines_path,
                 corpus_norm_dir=Path("data/corpus_norm"),
                 output_dir=index_path,
                 embedding_model=args.embedding_model,
@@ -181,6 +182,7 @@ def main():
         else:
             index_path = build_faiss_index(
                 corpus_dir=Path("data/corpus_raw"),
+                # corpus_norm_dir=guidelines_path,
                 corpus_norm_dir=Path("data/corpus_norm"),
                 output_dir=index_path,
                 embedding_model=args.embedding_model,

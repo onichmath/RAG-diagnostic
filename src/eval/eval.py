@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.retriever.faiss_builder import load_faiss_index
 from src.reranker.llm_title_rerank import rerank_by_title_llm
+from src.reranker.colbert_rerank import rerank_with_colbert
 from src.reader.reader import Generator, create_rag_prompt
 from src.eval.llm_metrics import compute_ragas_metrics
 
@@ -55,6 +56,8 @@ def evaluate_rag_system(
     k_array: list,
     use_llm_reranker: bool = False,
     llm_model: str = "local",
+    use_colbert_reranker: bool = False,
+    colbert_model: str = "bert-base-uncased",
     generator: Optional[Generator] = None,
     use_ragas: bool = False,
     ragas_model: str = "local",
@@ -69,6 +72,8 @@ def evaluate_rag_system(
         k_array: List of k values to evaluate
         use_llm_reranker: Whether to use LLM-based reranking
         llm_model: Model name for reranker (default: "local")
+        use_colbert_reranker: Whether to use ColBERT-style reranking
+        colbert_model: Model name for ColBERT reranker (default: "bert-base-uncased")
         generator: Optional Generator instance for answer generation (required for RAGAS)
         use_ragas: Whether to compute RAGAS metrics (requires generator)
         ragas_model: Model name for RAGAS judge (default: "local")
@@ -102,6 +107,16 @@ def evaluate_rag_system(
 
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
+            # ColBERT Reranker
+            if use_colbert_reranker:
+                # We rerank whatever FAISS found
+                search_results = rerank_with_colbert(
+                    query=query_text,
+                    docs=search_results,
+                    model_name=colbert_model,
+                    top_k=k,  # Return the same amount, just reordered
+                )
+
             # Title-Based Local LLM Reranker
             if use_llm_reranker:
                 search_results = rerank_by_title_llm(

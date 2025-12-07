@@ -21,6 +21,18 @@ _DEFAULT_MODEL_NAME = "microsoft/phi-2"
 # Global model cache
 _model_cache = {}
 
+# Try to import shared model from llm_title_rerank
+try:
+    from src.reranker.llm_title_rerank import (
+        get_shared_model,
+        get_shared_tokenizer,
+        get_shared_model_name,
+    )
+
+    _SHARED_MODEL_AVAILABLE = True
+except ImportError:
+    _SHARED_MODEL_AVAILABLE = False
+
 
 DEFAULT_METRICS = [
     "faithfulness",
@@ -33,7 +45,7 @@ DEFAULT_METRICS = [
 
 def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     """
-    Create a local HuggingFace LLM for Ragas, similar to llm_title_rerank.py.
+    Create a local HuggingFace LLM for Ragas, reusing model from llm_title_rerank.py if available.
 
     Args:
         model_name: Model name or "local" to use default (microsoft/phi-2)
@@ -48,6 +60,32 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     if model_name in _model_cache:
         return _model_cache[model_name]
 
+    # Try to reuse shared model from llm_title_rerank if available and matching
+    if _SHARED_MODEL_AVAILABLE and model_name == get_shared_model_name():
+        print(f"Reusing shared model from llm_title_rerank: {model_name}...")
+        shared_model = get_shared_model()
+        shared_tokenizer = get_shared_tokenizer()
+
+        # Create pipeline using shared model
+        pipe = pipeline(
+            "text-generation",
+            model=shared_model,
+            tokenizer=shared_tokenizer,
+            max_new_tokens=256,
+            do_sample=False,
+            temperature=0,
+            return_full_text=False,
+        )
+
+        # Wrap in LangChain HuggingFacePipeline
+        llm = HuggingFacePipeline(pipeline=pipe)
+
+        # Cache it
+        _model_cache[model_name] = llm
+
+        return llm
+
+    # Otherwise, load new model
     print(f"Loading local model: {model_name}...")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)

@@ -211,14 +211,14 @@ def parse_args():
         "--generator-model",
         type=str,
         default=None,
-        help="Model name for answer generation (default: qwen2.5:0.5b for Ollama, Qwen/Qwen2.5-0.5B for HF)",
+        help="Model name for answer generation (default: phi for Ollama, microsoft/phi-2 for HF)",
     )
 
     parser.add_argument(
         "--use-ollama",
         action="store_true",
-        default=True,
-        help="Use Ollama for generator (default: True)",
+        default=False,
+        help="Use Ollama for generator (default: False, uses shared model from llm_title_rerank)",
     )
     return parser.parse_args()
 
@@ -326,9 +326,23 @@ def main():
             logger.info(f"Generator model: {args.generator_model or 'default'}")
             logger.info(f"Using Ollama: {args.use_ollama}")
             try:
-                generator = Generator(
-                    model_name=args.generator_model, use_ollama=args.use_ollama
-                )
+                if args.use_ollama:
+                    generator = Generator(
+                        model_name=args.generator_model, use_ollama=True
+                    )
+                else:
+                    from src.reranker.llm_title_rerank import (
+                        get_shared_model,
+                        get_shared_tokenizer,
+                    )
+
+                    logger.info("Reusing shared model from llm_title_rerank")
+                    generator = Generator(
+                        model_name=args.generator_model,
+                        use_ollama=False,
+                        shared_model=get_shared_model(),
+                        shared_tokenizer=get_shared_tokenizer(),
+                    )
                 logger.info("Generator initialized successfully")
             except Exception as e:
                 logger.error(f"Failed to initialize Generator: {e}")

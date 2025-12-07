@@ -24,6 +24,22 @@ _model = AutoModelForCausalLM.from_pretrained(
 )
 
 
+# Export for reuse in other modules
+def get_shared_model():
+    """Get the shared model instance."""
+    return _model
+
+
+def get_shared_tokenizer():
+    """Get the shared tokenizer instance."""
+    return _tokenizer
+
+
+def get_shared_model_name():
+    """Get the shared model name."""
+    return _MODEL_NAME
+
+
 def _build_prompt(query: str, titles: List[str]) -> str:
     numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
 
@@ -48,7 +64,7 @@ Return ONLY a JSON list of indices like:
 def rerank_by_title_llm(
     query: str,
     docs: List[Document],
-    model_name: str = None,   # ignored, for compatibility
+    model_name: str = None,  # ignored, for compatibility
 ) -> List[Document]:
 
     if len(docs) <= 1:

@@ -367,6 +367,7 @@ def main():
             generator=generator,
             use_ragas=args.use_ragas,
             ragas_model=args.ragas_model,
+            embedding_model=args.embedding_model,
         )
 
         if args.save_results:

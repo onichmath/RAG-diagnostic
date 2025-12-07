@@ -61,6 +61,7 @@ def evaluate_rag_system(
     generator: Optional[Generator] = None,
     use_ragas: bool = False,
     ragas_model: str = "local",
+    embedding_model: Optional[str] = None,
 ):
     """
     Evaluate the RAG system using the given index and queries.
@@ -77,6 +78,7 @@ def evaluate_rag_system(
         generator: Optional Generator instance for answer generation (required for RAGAS)
         use_ragas: Whether to compute RAGAS metrics (requires generator)
         ragas_model: Model name for RAGAS judge (default: "local")
+        embedding_model: Embedding model name for RAGAS metrics (default: uses same as FAISS index)
     """
     test_queries = load_test_queries(queries_file, max_queries)
     vectorstore = load_faiss_index(index_path)
@@ -141,6 +143,7 @@ def evaluate_rag_system(
                     answer=answer,
                     ground_truth=golden_answer,
                     model_name=ragas_model,
+                    embedding_model=embedding_model,
                 )
 
                 # Accumulate RAGAS metrics

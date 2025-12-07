@@ -183,6 +183,7 @@ def compute_ragas_metrics(
     answer: str,
     ground_truth: str,
     model_name: str = "local",
+    embedding_model: Optional[str] = None,
     metrics: Optional[List[str]] = [
         "faithfulness",
         "answer_relevancy",
@@ -198,8 +199,9 @@ def compute_ragas_metrics(
         contexts: List of retrieved context strings for this question.
         answer: Generated answer from your RAG system.
         ground_truth: Gold answer (empty string if not available).
-        model_name: Local model name (default: "local" uses microsoft/phi-2).
+        model_name: Local model name (default: "local" uses meta-llama/Llama-3.1-8B-Instruct).
                     Can also specify any HuggingFace model name.
+        embedding_model: Embedding model for RAGAS metrics (default: uses _DEFAULT_EMBEDDING_MODEL).
         metrics: Which metrics to compute. Defaults to a standard set:
                  ["faithfulness", "answer_relevancy",
                   "context_precision", "context_recall"].
@@ -211,7 +213,7 @@ def compute_ragas_metrics(
         metrics = DEFAULT_METRICS
 
     llm = _build_llm(model_name)
-    embeddings = _build_embeddings()
+    embeddings = _build_embeddings(embedding_model)
     selected_metrics = _select_metrics(metrics, llm, embeddings)
 
     if not selected_metrics:

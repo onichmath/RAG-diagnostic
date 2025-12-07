@@ -11,7 +11,9 @@ set -e  # Exit on error
 
 # Env:
 # CPU: AMD EPYC 7643 48-Core Processor
-## GPU: Tesla V100, 32GB VRAM
+# GPU: Tesla V100, 32GB VRAM
+# Model: meta-llama/Llama-3.1-8B-Instruct
+# Embedding Model: thenlper/gte-small
 
 
 
@@ -33,6 +35,7 @@ echo ""
 PUBMED_DOCS=100000
 TEXTBOOK_DOCS=50000
 MAX_TEST_QUERIES=10
+EMBEDDING_MODEL="thenlper/gte-small"  # Change this to use a different embedding model for both FAISS and RAGAS
 
 # Test 1: RAGAS only (no rerankers)
 echo "[TEST 1/8] RAGAS Metrics (no rerankers)"
@@ -40,6 +43,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-ragas \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/ragas_only_${TIMESTAMP}.json" \
@@ -55,6 +59,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-llm-reranker \
     --use-ragas \
     --ragas-model "local" \
@@ -70,6 +75,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
@@ -86,6 +92,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-llm-reranker \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
@@ -108,6 +115,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-ragas \
     --ragas-model "local" \
     --filter-pubmed \
@@ -124,6 +132,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-llm-reranker \
     --use-ragas \
     --ragas-model "local" \
@@ -140,6 +149,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
@@ -157,6 +167,7 @@ python scripts/build_pipeline.py \
     --pubmed-docs $PUBMED_DOCS \
     --textbook-docs $TEXTBOOK_DOCS \
     --max-test-queries $MAX_TEST_QUERIES \
+    --embedding-model "$EMBEDDING_MODEL" \
     --use-llm-reranker \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \

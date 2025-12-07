@@ -10,7 +10,6 @@ from ragas.metrics import (
     answer_relevancy,
     context_precision,
     context_recall,
-    context_relevancy,
 )
 
 from langchain_community.llms import HuggingFacePipeline
@@ -39,7 +38,6 @@ DEFAULT_METRICS = [
     "answer_relevancy",
     "context_precision",
     "context_recall",
-    "context_relevancy",
 ]
 
 
@@ -125,7 +123,6 @@ def _select_metrics(
         "answer_relevancy": answer_relevancy,
         "context_precision": context_precision,
         "context_recall": context_recall,
-        "context_relevancy": context_relevancy,
     }
 
     selected = []
@@ -167,7 +164,7 @@ def compute_ragas_metrics(
                     Can also specify any HuggingFace model name.
         metrics: Which metrics to compute. Defaults to a standard set:
                  ["faithfulness", "answer_relevancy",
-                  "context_precision", "context_recall", "context_relevancy"].
+                  "context_precision", "context_recall"].
 
     Returns:
         Dict mapping metric name -> score (0.0–1.0).

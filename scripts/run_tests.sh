@@ -9,6 +9,10 @@
 
 set -e  # Exit on error
 
+# Env:
+# CPU: AMD EPYC 7643 48-Core Processor
+## GPU: Tesla V100, 32GB VRAM
+
 
 
 # Configuration
@@ -40,8 +44,8 @@ python scripts/build_pipeline.py \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/ragas_only_${TIMESTAMP}.json" \
     --save-results \
-    --filter-pubmed False \
-    --rebuild-index True \
+    --rebuild-index \ 
+    --use-gpu
 echo "✓ Saved to: ragas_only_${TIMESTAMP}.json"
 echo ""
 
@@ -56,6 +60,7 @@ python scripts/build_pipeline.py \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/llm_reranker_ragas_${TIMESTAMP}.json" \
     --save-results \
+    --use-gpu
 echo "✓ Saved to: llm_reranker_ragas_${TIMESTAMP}.json"
 echo ""
 
@@ -71,6 +76,7 @@ python scripts/build_pipeline.py \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/colbert_reranker_ragas_${TIMESTAMP}.json" \
     --save-results \
+    --use-gpu
 echo "✓ Saved to: colbert_reranker_ragas_${TIMESTAMP}.json"
 echo ""
 
@@ -86,7 +92,8 @@ python scripts/build_pipeline.py \
     --use-ragas \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/full_pipeline_${TIMESTAMP}.json" \
-    --save-results 
+    --save-results \
+    --use-gpu
 echo "✓ Saved to: full_pipeline_${TIMESTAMP}.json"
 echo ""
 
@@ -103,10 +110,11 @@ python scripts/build_pipeline.py \
     --max-test-queries $MAX_TEST_QUERIES \
     --use-ragas \
     --ragas-model "local" \
-    --filter-pubmed True\
+    --filter-pubmed \
     --output-file "${RESULTS_DIR}/filtered_ragas_only_${TIMESTAMP}.json" \
     --save-results \
-    $REBUILD_INDEX
+    --rebuild-index \
+    --use-gpu
 echo "✓ Saved to: filtered_ragas_only_${TIMESTAMP}.json"
 echo ""
 
@@ -119,9 +127,10 @@ python scripts/build_pipeline.py \
     --use-llm-reranker \
     --use-ragas \
     --ragas-model "local" \
-    --filter-pubmed \
+    --filter-pubmed  \
     --output-file "${RESULTS_DIR}/filtered_llm_reranker_ragas_${TIMESTAMP}.json" \
-    --save-results 
+    --save-results \
+    --use-gpu
 echo "✓ Saved to: filtered_llm_reranker_ragas_${TIMESTAMP}.json"
 echo ""
 
@@ -135,9 +144,10 @@ python scripts/build_pipeline.py \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
     --ragas-model "local" \
-    --filter-pubmed \
+    --filter-pubmed  \
     --output-file "${RESULTS_DIR}/filtered_colbert_reranker_ragas_${TIMESTAMP}.json" \
-    --save-results 
+    --save-results \
+    --use-gpu
 echo "✓ Saved to: filtered_colbert_reranker_ragas_${TIMESTAMP}.json"
 echo ""
 
@@ -152,9 +162,10 @@ python scripts/build_pipeline.py \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
     --ragas-model "local" \
-    --filter-pubmed \
+    --filter-pubmed  \
     --output-file "${RESULTS_DIR}/filtered_full_pipeline_${TIMESTAMP}.json" \
-    --save-results 
+    --save-results \
+    --use-gpu
 echo "✓ Saved to: filtered_full_pipeline_${TIMESTAMP}.json"
 echo ""
 

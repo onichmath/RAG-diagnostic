@@ -13,12 +13,17 @@ from ragas.metrics import (
 )
 
 from langchain_community.llms import HuggingFacePipeline
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
 
 # Default model - same as llm_title_rerank.py
-_DEFAULT_MODEL_NAME = "microsoft/phi-2"
+_DEFAULT_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+# Default embedding model for RAGAS metrics
+_DEFAULT_EMBEDDING_MODEL = "thenlper/gte-small"
 
 # Global model cache
 _model_cache = {}
+_embedding_cache = {}
 
 # Try to import shared model from llm_title_rerank
 try:
@@ -113,11 +118,35 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     return llm
 
 
+def _build_embeddings(embedding_model: str = None):
+    """Create local HuggingFace embeddings for RAGAS metrics."""
+    if embedding_model is None:
+        embedding_model = _DEFAULT_EMBEDDING_MODEL
+
+    # Use cached embeddings if available
+    if embedding_model in _embedding_cache:
+        return _embedding_cache[embedding_model]
+
+    # Use RAGAS's HuggingFace embeddings wrapper
+    try:
+        embeddings = RagasHuggingFaceEmbeddings(model=embedding_model)
+    except (ImportError, AttributeError):
+        # Fallback to LangChain embeddings if RAGAS wrapper not available
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        embeddings = HuggingFaceEmbeddings(
+            model_name=embedding_model, model_kwargs={"device": device}
+        )
+
+    _embedding_cache[embedding_model] = embeddings
+    return embeddings
+
+
 def _select_metrics(
     metric_names: List[str],
     llm: HuggingFacePipeline,
+    embeddings,
 ):
-    """Map metric name strings to Ragas metric objects and attach LLM if needed."""
+    """Map metric name strings to Ragas metric objects and attach LLM/embeddings if needed."""
     metric_map = {
         "faithfulness": faithfulness,
         "answer_relevancy": answer_relevancy,
@@ -127,11 +156,21 @@ def _select_metrics(
 
     selected = []
     for name in metric_names:
-        metric = metric_map.get(name)
-        if metric is None:
+        # Create new metric instances to avoid shared state
+        if name == "faithfulness":
+            metric = faithfulness(llm=llm)
+        elif name == "answer_relevancy":
+            metric = answer_relevancy(llm=llm, embeddings=embeddings)
+        elif name == "context_precision":
+            metric = context_precision(embeddings=embeddings)
+        elif name == "context_recall":
+            metric = context_recall(embeddings=embeddings)
+        else:
             continue
         if hasattr(metric, "llm"):
             metric.llm = llm
+        if hasattr(metric, "embeddings"):
+            metric.embeddings = embeddings
 
         selected.append(metric)
 
@@ -172,7 +211,8 @@ def compute_ragas_metrics(
         metrics = DEFAULT_METRICS
 
     llm = _build_llm(model_name)
-    selected_metrics = _select_metrics(metrics, llm)
+    embeddings = _build_embeddings()
+    selected_metrics = _select_metrics(metrics, llm, embeddings)
 
     if not selected_metrics:
         return {}
@@ -188,7 +228,6 @@ def compute_ragas_metrics(
     result = evaluate(
         dataset=dataset,
         metrics=selected_metrics,
-        llm=llm,
     )
 
     scores: Dict[str, float] = {}

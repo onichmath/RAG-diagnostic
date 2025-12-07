@@ -13,7 +13,9 @@ import torch
 # Choose a model that works in Colab:
 # On GPU Colab: Llama 3-8B works reasonably well.
 # On CPU-only Colab: use microsoft/phi-2 (lighter).
-_MODEL_NAME = "microsoft/phi-2"
+#_MODEL_NAME = "microsoft/phi-2"
+_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+
 
 # Load tokenizer/model once at import time
 _tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME)

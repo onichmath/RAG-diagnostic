@@ -149,7 +149,6 @@ def compute_ragas_metrics(
         "answer_relevancy",
         "context_precision",
         "context_recall",
-        "context_relevancy",
     ],
 ) -> Dict[str, float]:
     """

@@ -44,7 +44,7 @@ python scripts/build_pipeline.py \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/ragas_only_${TIMESTAMP}.json" \
     --save-results \
-    --rebuild-index \ 
+    --rebuild-index \
     --use-gpu
 echo "✓ Saved to: ragas_only_${TIMESTAMP}.json"
 echo ""

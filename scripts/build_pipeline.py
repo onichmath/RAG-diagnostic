@@ -220,6 +220,12 @@ def parse_args():
         default=False,
         help="Use Ollama for generator (default: False, uses shared model from llm_title_rerank)",
     )
+    parser.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        default=False,
+        help="Rebuild FAISS index (default: False)",
+    )
     return parser.parse_args()
 
 
@@ -282,7 +288,7 @@ def main():
     # Step 4: Build FAISS index if not exists
     # Step 4: Build FAISS index if not exists
     index_path = Path("data/indices/faiss_index")
-    if not index_path.exists():
+    if not index_path.exists() or args.rebuild_index:
         logger.info("Step 4: Building FAISS index...")
         logger.info(f"Using embedding model: {args.embedding_model}")
         logger.info(f"Using fast FAISS: {args.use_fast_faiss}")

@@ -396,8 +396,8 @@ def compute_ragas_metrics_batch(
     model_name: str = "local",
     embedding_model: Optional[str] = None,
     metrics: Optional[List[str]] = [
-        "faithfulness",
-        "answer_relevancy",
+        # "faithfulness",
+        # "answer_relevancy",
         "context_precision",
         "context_recall",
     ],

@@ -153,6 +153,7 @@ def parse_args():
     )
     parser.add_argument(
         "--save-results",
+        action="store_true",
         default=True,
         help="Save evaluation results to a JSON file (default: False, pass this flag to enable)",
     )
@@ -236,6 +237,8 @@ def parse_args():
 def main():
     """Run the complete pipeline using LangChain."""
     args = parse_args()
+    if not args.save_results:
+        logging.warning("Results will not be saved without the --save-results flag")
 
     logger.info("Starting RAG Diagnostic Pipeline (LangChain)")
     logger.info("=" * 60)

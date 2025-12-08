@@ -46,7 +46,17 @@ except ImportError:
     )
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
+
+# Import RAGAS embeddings - required for RAGAS metrics
+try:
+    from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
+
+    _RAGAS_EMBEDDINGS_AVAILABLE = True
+    _RAGAS_EMBEDDINGS_IMPORT_ERROR = None
+except ImportError as e:
+    _RAGAS_EMBEDDINGS_AVAILABLE = False
+    RagasHuggingFaceEmbeddings = None
+    _RAGAS_EMBEDDINGS_IMPORT_ERROR = e
 
 # Default model for RAGAS judge (optimized for RAGAS evaluation)
 _DEFAULT_MODEL_NAME = "vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ"
@@ -247,7 +257,7 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
             "text-generation",
             model=shared_model,
             tokenizer=shared_tokenizer,
-            max_new_tokens=2048,  # Increased for complete JSON generation
+            # max_new_tokens=2048,  # Increased for complete JSON generation
             do_sample=False,
             return_full_text=False,
         )
@@ -283,7 +293,7 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=2048,  # Increased for complete JSON generation
+        # max_new_tokens=2048,  # Increased for complete JSON generation
         do_sample=False,
         return_full_text=False,
     )
@@ -298,7 +308,10 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
 
 
 def _build_embeddings(embedding_model: str = None):
-    """Create local HuggingFace embeddings for RAGAS metrics."""
+    """Create local HuggingFace embeddings for RAGAS metrics.
+
+    RAGAS requires its own embeddings class, not LangChain's.
+    """
     if embedding_model is None:
         embedding_model = _DEFAULT_EMBEDDING_MODEL
 
@@ -306,14 +319,42 @@ def _build_embeddings(embedding_model: str = None):
     if embedding_model in _embedding_cache:
         return _embedding_cache[embedding_model]
 
-    # Use RAGAS's HuggingFace embeddings wrapper
+    # Check if RAGAS embeddings are available
+    if not _RAGAS_EMBEDDINGS_AVAILABLE or RagasHuggingFaceEmbeddings is None:
+        error_msg = f"RAGAS embeddings not available."
+        if _RAGAS_EMBEDDINGS_IMPORT_ERROR:
+            error_msg += f" Import error: {_RAGAS_EMBEDDINGS_IMPORT_ERROR}."
+        error_msg += " Make sure 'ragas' is properly installed: pip install ragas"
+        raise RuntimeError(error_msg)
+
+    # RAGAS requires its own embeddings class - don't fallback to LangChain
+    # Try different parameter names that RAGAS might accept
+    embeddings = None
+    last_error = None
+
+    # Try with 'model' parameter (most common)
     try:
         embeddings = RagasHuggingFaceEmbeddings(model=embedding_model)
-    except (ImportError, AttributeError):
-        # Fallback to LangChain embeddings if RAGAS wrapper not available
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        embeddings = HuggingFaceEmbeddings(
-            model_name=embedding_model, model_kwargs={"device": device}
+    except (TypeError, AttributeError, ValueError) as e:
+        last_error = e
+        # Try with 'model_name' parameter
+        try:
+            embeddings = RagasHuggingFaceEmbeddings(model_name=embedding_model)
+        except (TypeError, AttributeError, ValueError) as e2:
+            last_error = e2
+            # Try positional argument
+            try:
+                embeddings = RagasHuggingFaceEmbeddings(embedding_model)
+            except Exception as e3:
+                last_error = e3
+
+    if embeddings is None:
+        raise RuntimeError(
+            f"Failed to create RAGAS embeddings with model '{embedding_model}'. "
+            f"Error: {last_error}. "
+            "RAGAS requires its own embeddings class. "
+            "Tried parameters: 'model', 'model_name', and positional. "
+            "Check RAGAS documentation for correct usage."
         )
 
     _embedding_cache[embedding_model] = embeddings
@@ -350,110 +391,6 @@ def _select_metrics(
     return selected
 
 
-def compute_ragas_metrics_batch(
-    eval_data: List[Dict[str, Any]],
-    model_name: str = "local",
-    embedding_model: Optional[str] = None,
-    metrics: Optional[List[str]] = [
-        "faithfulness",
-        "answer_relevancy",
-        "context_precision",
-        "context_recall",
-    ],
-) -> List[Dict[str, float]]:
-    """
-    Compute RAGAS metrics for multiple query-answer pairs in batch (much faster).
-
-    Args:
-        eval_data: List of dicts, each with keys: "question", "contexts", "answer", "ground_truth"
-        model_name: Model name (see compute_ragas_metrics for options)
-        embedding_model: Embedding model for RAGAS metrics
-        metrics: Which metrics to compute
-
-    Returns:
-        List of dicts, each mapping metric name -> score (0.0–1.0)
-    """
-    if metrics is None:
-        metrics = DEFAULT_METRICS
-
-    if not eval_data:
-        return []
-
-    llm = _build_llm(model_name)
-    embeddings = _build_embeddings(embedding_model)
-    selected_metrics = _select_metrics(metrics, llm, embeddings)
-
-    if not selected_metrics:
-        return [{}] * len(eval_data)
-
-    # Create dataset with all queries at once
-    dataset = Dataset.from_list(eval_data)
-
-    # Evaluate all at once (much faster than one-by-one)
-    result = evaluate(
-        dataset=dataset,
-        metrics=selected_metrics,
-    )
-
-    # Extract scores for all queries
-    all_scores = []
-
-    if hasattr(result, "to_pandas"):
-        df = result.to_pandas()
-        for idx in range(len(eval_data)):
-            scores = {}
-            for name in metrics:
-                if name in df.columns:
-                    scores[name] = float(df[name].iloc[idx])
-                else:
-                    raise ValueError(
-                        f"Metric '{name}' not found in RAGAS results. Available columns: {df.columns.tolist()}"
-                    )
-            all_scores.append(scores)
-    elif hasattr(result, "column_names"):
-        for idx in range(len(eval_data)):
-            scores = {}
-            for name in metrics:
-                if name in result.column_names:
-                    value = result[name][idx]
-                    scores[name] = float(value)
-                else:
-                    raise ValueError(
-                        f"Metric '{name}' not found in RAGAS results. Available columns: {result.column_names}"
-                    )
-            all_scores.append(scores)
-    elif hasattr(result, "__getitem__"):
-        for idx in range(len(eval_data)):
-            scores = {}
-            for name in metrics:
-                if name in result:
-                    value = (
-                        result[name][idx]
-                        if isinstance(result[name], list)
-                        else result[name]
-                    )
-                    scores[name] = float(value)
-                else:
-                    raise ValueError(f"Metric '{name}' not found in RAGAS results")
-            all_scores.append(scores)
-    else:
-        # Fallback: assume single result per query
-        for idx in range(len(eval_data)):
-            scores = {}
-            for name in metrics:
-                if hasattr(result, name):
-                    value = getattr(result, name)
-                    if isinstance(value, (list, tuple)) and len(value) > idx:
-                        scores[name] = float(value[idx])
-                    else:
-                        scores[name] = float(value) if idx == 0 else 0.0
-                else:
-                    raise ValueError(f"Metric '{name}' not found in RAGAS results")
-            all_scores.append(scores)
-
-    return all_scores
-
-
 def compute_ragas_metrics(
     question: str,
     contexts: List[str],
@@ -462,8 +399,8 @@ def compute_ragas_metrics(
     model_name: str = "local",
     embedding_model: Optional[str] = None,
     metrics: Optional[List[str]] = [
-        "faithfulness",
-        "answer_relevancy",
+        # "faithfulness",
+        # "answer_relevancy",
         "context_precision",
         "context_recall",
     ],

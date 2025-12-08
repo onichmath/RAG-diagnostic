@@ -148,7 +148,7 @@ def parse_args():
     parser.add_argument(
         "--k-array",
         type=list,
-        default=[5, 10, 20, 50, 100],
+        default=[5, 10, 20],  # , 50, 100],
         help="Array of k values to evaluate",
     )
     parser.add_argument(

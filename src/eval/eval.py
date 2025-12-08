@@ -15,6 +15,7 @@ import math
 from typing import Optional
 from matplotlib import pyplot as plt
 import seaborn as sns
+import tqdm
 
 
 def load_test_queries(queries_file: Path, max_queries: int):
@@ -100,7 +101,12 @@ def evaluate_rag_system(
         # RAGAS metrics totals
         ragas_totals = {}
 
-        for i, query_data in enumerate(test_queries, 1):
+        # Use tqdm to show progress
+        for i, query_data in tqdm(
+            enumerate(test_queries, 1),
+            total=len(test_queries),
+            desc="Evaluating queries",
+        ):
             query_text = query_data.get("query_text", "")
             expected_gold_docs = query_data.get("expected_gold_docs", [])
             golden_answer = query_data.get("golden_answer", "")

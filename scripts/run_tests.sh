@@ -18,15 +18,49 @@ set -e  # Exit on error
 
 
 # Configuration
-BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Get the absolute path to the project root
+# Try to find the project root by looking for common markers
+if [ -f "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+elif [ -f "$0" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+    # Fallback: assume we're in the project root
+    BASE_DIR="$(pwd)"
+fi
+
+# Normalize path to remove any trailing slashes and ensure it's absolute
+BASE_DIR="$(cd "$BASE_DIR" && pwd)"
+BASE_DIR="${BASE_DIR%/}"
+
+# Validate BASE_DIR
+if [ -z "$BASE_DIR" ] || [ "$BASE_DIR" = "/" ] || [ ! -d "$BASE_DIR" ]; then
+    echo "Error: Invalid BASE_DIR: '$BASE_DIR'" >&2
+    echo "Script location: ${BASH_SOURCE[0]:-$0}" >&2
+    echo "Current directory: $(pwd)" >&2
+    exit 1
+fi
+
+# Ensure we're in the right directory (should have data/ and scripts/ subdirectories)
+if [ ! -d "$BASE_DIR/data" ] || [ ! -d "$BASE_DIR/scripts" ]; then
+    echo "Warning: BASE_DIR doesn't appear to be the project root: $BASE_DIR" >&2
+    echo "Looking for data/ and scripts/ directories..." >&2
+fi
+
 RESULTS_DIR="${BASE_DIR}/data/test_results"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+# Normalize RESULTS_DIR to remove any double slashes
+RESULTS_DIR=$(echo "$RESULTS_DIR" | sed 's|//|/|g')
 
 # Create results directory
 mkdir -p "$RESULTS_DIR"
 
 echo "=========================================="
 echo "RAG Pipeline Test Suite (RAGAS Only)"
+echo "BASE_DIR: $BASE_DIR"
 echo "Results will be saved to: $RESULTS_DIR"
 echo "Timestamp: $TIMESTAMP"
 echo "=========================================="

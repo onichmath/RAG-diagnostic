@@ -57,7 +57,7 @@ python scripts/build_pipeline.py \
     --max-test-queries $MAX_TEST_QUERIES \
     --embedding-model "$EMBEDDING_MODEL" \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --output-file "${RESULTS_DIR}/ragas_only_${TIMESTAMP}.json" \
     --save-results \
     --use-gpu 
@@ -74,7 +74,7 @@ python scripts/build_pipeline.py \
     --embedding-model "$EMBEDDING_MODEL" \
     --use-llm-reranker \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --output-file "${RESULTS_DIR}/llm_reranker_ragas_${TIMESTAMP}.json" \
     --save-results \
     --use-gpu
@@ -91,7 +91,7 @@ python scripts/build_pipeline.py \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --output-file "${RESULTS_DIR}/colbert_reranker_ragas_${TIMESTAMP}.json" \
     --save-results \
     --use-gpu
@@ -109,7 +109,7 @@ python scripts/build_pipeline.py \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --output-file "${RESULTS_DIR}/full_pipeline_${TIMESTAMP}.json" \
     --save-results \
     --use-gpu
@@ -129,7 +129,7 @@ python scripts/build_pipeline.py \
     --max-test-queries $MAX_TEST_QUERIES \
     --embedding-model "$EMBEDDING_MODEL" \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --filter-pubmed \
     --output-file "${RESULTS_DIR}/filtered_ragas_only_${TIMESTAMP}.json" \
     --save-results \
@@ -147,7 +147,7 @@ python scripts/build_pipeline.py \
     --embedding-model "$EMBEDDING_MODEL" \
     --use-llm-reranker \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --filter-pubmed  \
     --output-file "${RESULTS_DIR}/filtered_llm_reranker_ragas_${TIMESTAMP}.json" \
     --save-results \
@@ -165,7 +165,7 @@ python scripts/build_pipeline.py \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --filter-pubmed  \
     --output-file "${RESULTS_DIR}/filtered_colbert_reranker_ragas_${TIMESTAMP}.json" \
     --save-results \
@@ -184,7 +184,7 @@ python scripts/build_pipeline.py \
     --use-colbert-reranker \
     --colbert-model "bert-base-uncased" \
     --use-ragas \
-    --ragas-model "local" \
+    --ragas-model "gpt-4o-mini" \
     --filter-pubmed  \
     --output-file "${RESULTS_DIR}/filtered_full_pipeline_${TIMESTAMP}.json" \
     --save-results \

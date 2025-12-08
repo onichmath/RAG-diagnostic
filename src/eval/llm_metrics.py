@@ -1,6 +1,7 @@
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 import json
 import re
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
@@ -21,6 +22,14 @@ from ragas.metrics import (
     context_precision,
     context_recall,
 )
+
+# Try to import RAGAS llm_factory for OpenAI support
+try:
+    from ragas.llms import llm_factory
+
+    _RAGAS_LLM_FACTORY_AVAILABLE = True
+except ImportError:
+    _RAGAS_LLM_FACTORY_AVAILABLE = False
 
 # Try to use updated langchain-huggingface package, fallback to deprecated version
 try:
@@ -139,17 +148,83 @@ class JSONSanitizingLLM(HuggingFacePipeline):
         return None
 
 
-def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
+def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
     """
-    Create a local HuggingFace LLM for Ragas.
-    Uses a different default model than the LLM reranker (optimized for RAGAS).
+    Create an LLM for Ragas (local HuggingFace or OpenAI API).
 
     Args:
-        model_name: Model name or "local" to use default (vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ)
+        model_name:
+            - "local" or HuggingFace model name (e.g., "vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ")
+            - "openai:gpt-4" or "openai:gpt-4o" for OpenAI API (requires OPENAI_API_KEY env var)
+            - "gpt-4" or "gpt-4o" (shortcut, automatically uses OpenAI)
 
     Returns:
-        HuggingFacePipeline LLM instance
+        LLM instance (HuggingFacePipeline for local, RAGAS LLM for OpenAI)
     """
+    # Handle OpenAI API models
+    # Check for OpenAI models (but not "openai:local" which is invalid)
+    is_openai_model = (
+        model_name.startswith("openai:") and not model_name == "openai:local"
+    ) or model_name in [
+        "gpt-4",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+        "gpt-3.5-turbo",
+    ]
+
+    if is_openai_model:
+        if not _RAGAS_LLM_FACTORY_AVAILABLE:
+            raise ImportError(
+                "RAGAS llm_factory not available. Install with: pip install ragas[openai]"
+            )
+
+        # Extract model name (remove "openai:" prefix if present)
+        openai_model = model_name.replace("openai:", "")
+
+        # Check for API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY environment variable not set. "
+                "Set it with: export OPENAI_API_KEY='your-key-here'"
+            )
+
+        # Use cached model if available
+        cache_key = f"openai:{openai_model}"
+        if cache_key in _model_cache:
+            return _model_cache[cache_key]
+
+        print(f"Using OpenAI API model: {openai_model}...")
+
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=api_key)
+
+            # Use RAGAS's llm_factory with OpenAI
+            # Try with provider parameter first, fallback to auto-detect
+            try:
+                llm = llm_factory(openai_model, provider="openai", client=client)
+            except (TypeError, ValueError):
+                # Some RAGAS versions auto-detect provider from model name
+                llm = llm_factory(openai_model, client=client)
+
+            # Cache it
+            _model_cache[cache_key] = llm
+
+            return llm
+        except ImportError:
+            raise ImportError(
+                "OpenAI package not installed. Install with: pip install openai"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to initialize OpenAI LLM: {e}. "
+                "Make sure OPENAI_API_KEY is set and valid."
+            ) from e
+
+    # Handle local HuggingFace models
     if model_name == "local":
         model_name = _DEFAULT_MODEL_NAME
 
@@ -247,7 +322,7 @@ def _build_embeddings(embedding_model: str = None):
 
 def _select_metrics(
     metric_names: List[str],
-    llm: HuggingFacePipeline,
+    llm: Union[HuggingFacePipeline, Any],
     embeddings,
 ):
     """Map metric name strings to Ragas metric objects and attach LLM/embeddings if needed."""
@@ -290,15 +365,17 @@ def compute_ragas_metrics(
     ],
 ) -> Dict[str, float]:
     """
-    Compute RAGAS metrics for a single query-answer pair using local HuggingFace model.
+    Compute RAGAS metrics for a single query-answer pair.
 
     Args:
         question: User question.
         contexts: List of retrieved context strings for this question.
         answer: Generated answer from your RAG system.
         ground_truth: Gold answer (empty string if not available).
-        model_name: Local model name (default: "local" uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ).
-                    Can also specify any HuggingFace model name.
+        model_name:
+            - "local" (default) uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ
+            - HuggingFace model name (e.g., "microsoft/phi-2")
+            - "openai:gpt-4" or "gpt-4" for OpenAI API (requires OPENAI_API_KEY)
         embedding_model: Embedding model for RAGAS metrics (default: uses _DEFAULT_EMBEDDING_MODEL).
         metrics: Which metrics to compute. Defaults to a standard set:
                  ["faithfulness", "answer_relevancy",

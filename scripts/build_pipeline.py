@@ -203,8 +203,10 @@ def parse_args():
     parser.add_argument(
         "--ragas-model",
         type=str,
-        default="local",
-        help="Model name for RAGAS judge (default: 'local' uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ)",
+        default="gpt-4o-mini",
+        help="Model name for RAGAS judge. Options: 'gpt-4o-mini' (default, OpenAI API), "
+        "'local' (uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ), "
+        "HuggingFace model name, or 'openai:gpt-4'/'gpt-4' for OpenAI API (requires OPENAI_API_KEY env var)",
     )
 
     parser.add_argument(

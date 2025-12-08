@@ -90,14 +90,17 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         shared_model = get_shared_model()
         shared_tokenizer = get_shared_tokenizer()
 
+        # Set pad_token if not already set
+        if shared_tokenizer.pad_token is None:
+            shared_tokenizer.pad_token = shared_tokenizer.eos_token
+
         # Create pipeline using shared model
         pipe = pipeline(
             "text-generation",
             model=shared_model,
             tokenizer=shared_tokenizer,
-            max_new_tokens=256,
+            max_new_tokens=2048,
             do_sample=False,
-            temperature=0,
             return_full_text=False,
         )
 
@@ -113,6 +116,11 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     print(f"Loading local model: {model_name}...")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # Set pad_token if not already set
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float32,
@@ -124,9 +132,8 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=256,
+        max_new_tokens=2048,
         do_sample=False,
-        temperature=0,
         return_full_text=False,
     )
 
@@ -248,12 +255,49 @@ def compute_ragas_metrics(
     )
 
     scores: Dict[str, float] = {}
-    for name in metrics:
-        if name in result.column_names:
-            value = result[name][0]
-            try:
+
+    # Handle different RAGAS result types
+    # Newer versions return EvaluationResult, older versions return Dataset
+    if hasattr(result, "to_pandas"):
+        # EvaluationResult - convert to pandas DataFrame
+        df = result.to_pandas()
+        for name in metrics:
+            if name in df.columns:
+                scores[name] = float(df[name].iloc[0])
+            else:
+                raise ValueError(
+                    f"Metric '{name}' not found in RAGAS results. Available columns: {df.columns.tolist()}"
+                )
+    elif hasattr(result, "column_names"):
+        # Dataset with column_names attribute
+        for name in metrics:
+            if name in result.column_names:
+                value = result[name][0]
                 scores[name] = float(value)
-            except (TypeError, ValueError):
-                scores[name] = -1.0
+            else:
+                raise ValueError(
+                    f"Metric '{name}' not found in RAGAS results. Available columns: {result.column_names}"
+                )
+    elif hasattr(result, "__getitem__"):
+        # Dataset-like object
+        for name in metrics:
+            if name in result:
+                value = (
+                    result[name][0] if isinstance(result[name], list) else result[name]
+                )
+                scores[name] = float(value)
+            else:
+                raise ValueError(f"Metric '{name}' not found in RAGAS results")
+    else:
+        # Try to access as dict
+        for name in metrics:
+            if hasattr(result, name):
+                value = getattr(result, name)
+                if isinstance(value, (list, tuple)) and len(value) > 0:
+                    scores[name] = float(value[0])
+                else:
+                    scores[name] = float(value)
+            else:
+                raise ValueError(f"Metric '{name}' not found in RAGAS results")
 
     return scores

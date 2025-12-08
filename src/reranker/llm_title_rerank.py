@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
 # Choose a model that works in Colab:
-# On GPU Colab: Llama 3.2-3B works reasonably well.
+# On GPU Colab: Llama 3-8B works reasonably well.
 # On CPU-only Colab: use microsoft/phi-2 (lighter).
 # _MODEL_NAME = "microsoft/phi-2"
 _MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
@@ -19,6 +19,11 @@ _MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 
 # Load tokenizer/model once at import time
 _tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME)
+
+# Set pad_token if not already set
+if _tokenizer.pad_token is None:
+    _tokenizer.pad_token = _tokenizer.eos_token
+
 _model = AutoModelForCausalLM.from_pretrained(
     _MODEL_NAME,
     torch_dtype=torch.float32,
@@ -83,7 +88,11 @@ def rerank_by_title_llm(
     inputs = _tokenizer(prompt, return_tensors="pt").to(_model.device)
 
     with torch.no_grad():
-        outputs = _model.generate(**inputs, max_new_tokens=128, do_sample=False)
+        outputs = _model.generate(
+            **inputs,
+            max_new_tokens=128,
+            do_sample=False
+        )
 
     response = _tokenizer.decode(outputs[0], skip_special_tokens=True)
 

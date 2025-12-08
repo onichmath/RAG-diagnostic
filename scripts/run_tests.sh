@@ -12,7 +12,7 @@ set -e  # Exit on error
 # Env:
 # CPU: AMD EPYC 7D12 32-Core Processor
 # GPU: RTX 3090, 24GB VRAM
-# Model: meta-llama/Llama-3.1-8B-Instruct
+# Model: meta-llama/Llama-3.2-3B-Instruct
 # Embedding Model: thenlper/gte-small
 
 

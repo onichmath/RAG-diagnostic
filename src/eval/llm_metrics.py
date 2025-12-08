@@ -38,7 +38,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
 
 # Default model - same as llm_title_rerank.py
-_DEFAULT_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+_DEFAULT_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 # Default embedding model for RAGAS metrics
 _DEFAULT_EMBEDDING_MODEL = "thenlper/gte-small"
 
@@ -72,7 +72,7 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     Create a local HuggingFace LLM for Ragas, reusing model from llm_title_rerank.py if available.
 
     Args:
-        model_name: Model name or "local" to use default (microsoft/phi-2)
+        model_name: Model name or "local" to use default (meta-llama/Llama-3.2-3B-Instruct)
 
     Returns:
         HuggingFacePipeline LLM instance
@@ -214,7 +214,7 @@ def compute_ragas_metrics(
         contexts: List of retrieved context strings for this question.
         answer: Generated answer from your RAG system.
         ground_truth: Gold answer (empty string if not available).
-        model_name: Local model name (default: "local" uses meta-llama/Llama-3.1-8B-Instruct).
+        model_name: Local model name (default: "local" uses meta-llama/Llama-3.2-3B-Instruct).
                     Can also specify any HuggingFace model name.
         embedding_model: Embedding model for RAGAS metrics (default: uses _DEFAULT_EMBEDDING_MODEL).
         metrics: Which metrics to compute. Defaults to a standard set:

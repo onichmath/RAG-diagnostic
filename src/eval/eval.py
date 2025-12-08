@@ -160,6 +160,7 @@ def evaluate_rag_system(
                         "ground_truth": golden_answer or "",
                     }
                 )
+                print(ragas_eval_data)
 
             relevant_found = 0
             relevant_positions = []
@@ -226,7 +227,7 @@ def evaluate_rag_system(
                     if metric_name not in ragas_totals:
                         ragas_totals[metric_name] = 0.0
                     ragas_totals[metric_name] += score
-
+        print(f"ragas_totals for k={k}: {ragas_totals}")
         total_time = total_latency_at_k
         throughput = total_queries / total_time if total_time > 0 else 0.0  # QPS
 

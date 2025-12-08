@@ -7,7 +7,7 @@ from src.retriever.faiss_builder import load_faiss_index
 from src.reranker.llm_title_rerank import rerank_by_title_llm
 from src.reranker.colbert_rerank import rerank_with_colbert
 from src.reader.reader import Generator, create_rag_prompt
-from src.eval.llm_metrics import compute_ragas_metrics
+from src.eval.llm_metrics import compute_ragas_metrics_batch
 
 from time import time
 import json
@@ -160,7 +160,7 @@ def evaluate_rag_system(
                         "ground_truth": golden_answer or "",
                     }
                 )
-                print(ragas_eval_data)
+                # print(ragas_eval_data)
 
             relevant_found = 0
             relevant_positions = []
@@ -213,7 +213,6 @@ def evaluate_rag_system(
             print(
                 f"Batch evaluating RAGAS metrics for {len(ragas_eval_data)} queries..."
             )
-            from src.eval.llm_metrics import compute_ragas_metrics_batch
 
             ragas_scores_list = compute_ragas_metrics_batch(
                 eval_data=ragas_eval_data,

@@ -26,6 +26,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Suppress httpx INFO logs (OpenAI API requests)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 def parse_args():
     """Parse command line arguments."""
@@ -150,9 +153,8 @@ def parse_args():
     )
     parser.add_argument(
         "--save-results",
-        action="store_false",
         default=True,
-        help="Save evaluation results to a JSON file (default: True)",
+        help="Save evaluation results to a JSON file (default: False, pass this flag to enable)",
     )
 
     # Filter options

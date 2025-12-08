@@ -61,7 +61,7 @@ def evaluate_rag_system(
     colbert_model: str = "bert-base-uncased",
     generator: Optional[Generator] = None,
     use_ragas: bool = False,
-    ragas_model: str = "local",
+    ragas_model: str = "gpt-4o-mini",
     embedding_model: Optional[str] = None,
 ):
     """
@@ -78,7 +78,7 @@ def evaluate_rag_system(
         colbert_model: Model name for ColBERT reranker (default: "bert-base-uncased")
         generator: Optional Generator instance for answer generation (required for RAGAS)
         use_ragas: Whether to compute RAGAS metrics (requires generator)
-        ragas_model: Model name for RAGAS judge (default: "local")
+        ragas_model: Model name for RAGAS judge (default: "gpt-4o-mini" for OpenAI API)
         embedding_model: Embedding model name for RAGAS metrics (default: uses same as FAISS index)
     """
     test_queries = load_test_queries(queries_file, max_queries)
@@ -112,12 +112,12 @@ def evaluate_rag_system(
             golden_answer = query_data.get("golden_answer", "")
 
             expected_source = "guideline"
-            
+
             print(f"Query {i-1} running similarity search...")
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
             # ColBERT Reranker
-            
+
             if use_colbert_reranker:
                 print(f"Query {i-1} running ColBERT reranker...")
                 # We rerank whatever FAISS found

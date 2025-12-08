@@ -355,7 +355,7 @@ def compute_ragas_metrics(
     contexts: List[str],
     answer: str,
     ground_truth: str,
-    model_name: str = "local",
+    model_name: str = "gpt-4o-mini",
     embedding_model: Optional[str] = None,
     metrics: Optional[List[str]] = [
         "faithfulness",
@@ -373,7 +373,8 @@ def compute_ragas_metrics(
         answer: Generated answer from your RAG system.
         ground_truth: Gold answer (empty string if not available).
         model_name:
-            - "local" (default) uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ
+            - "gpt-4o-mini" (default, OpenAI API, requires OPENAI_API_KEY)
+            - "local" uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ
             - HuggingFace model name (e.g., "microsoft/phi-2")
             - "openai:gpt-4" or "gpt-4" for OpenAI API (requires OPENAI_API_KEY)
         embedding_model: Embedding model for RAGAS metrics (default: uses _DEFAULT_EMBEDDING_MODEL).

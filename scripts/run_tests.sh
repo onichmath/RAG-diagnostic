@@ -10,8 +10,8 @@
 set -e  # Exit on error
 
 # Env:
-# CPU: AMD EPYC 7643 48-Core Processor
-# GPU: Tesla V100, 32GB VRAM
+# CPU: AMD EPYC 7D12 32-Core Processor
+# GPU: RTX 3090, 24GB VRAM
 # Model: meta-llama/Llama-3.1-8B-Instruct
 # Embedding Model: thenlper/gte-small
 
@@ -48,8 +48,8 @@ python scripts/build_pipeline.py \
     --ragas-model "local" \
     --output-file "${RESULTS_DIR}/ragas_only_${TIMESTAMP}.json" \
     --save-results \
-    --rebuild-index \
-    --use-gpu
+    --use-gpu 
+    #--rebuild-index \
 echo "✓ Saved to: ragas_only_${TIMESTAMP}.json"
 echo ""
 

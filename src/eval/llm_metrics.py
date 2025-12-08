@@ -2,6 +2,14 @@ from typing import List, Dict, Optional
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
+# Suppress torchvision beta warnings
+try:
+    import torchvision
+
+    torchvision.disable_beta_transforms_warning()
+except ImportError:
+    pass
+
 from datasets import Dataset
 
 from ragas import evaluate
@@ -12,7 +20,20 @@ from ragas.metrics import (
     context_recall,
 )
 
-from langchain_community.llms import HuggingFacePipeline
+# Try to use updated langchain-huggingface package, fallback to deprecated version
+try:
+    from langchain_huggingface import HuggingFacePipeline
+except ImportError:
+    from langchain_community.llms import HuggingFacePipeline
+    import warnings
+
+    warnings.warn(
+        "Using deprecated langchain_community.llms.HuggingFacePipeline. "
+        "Install langchain-huggingface for the updated version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
 
@@ -156,17 +177,11 @@ def _select_metrics(
 
     selected = []
     for name in metric_names:
-        # Create new metric instances to avoid shared state
-        if name == "faithfulness":
-            metric = faithfulness(llm=llm)
-        elif name == "answer_relevancy":
-            metric = answer_relevancy(llm=llm, embeddings=embeddings)
-        elif name == "context_precision":
-            metric = context_precision(embeddings=embeddings)
-        elif name == "context_recall":
-            metric = context_recall(embeddings=embeddings)
-        else:
+        metric = metric_map.get(name)
+        if metric is None:
             continue
+
+        # Metrics are already instantiated objects, just set attributes directly
         if hasattr(metric, "llm"):
             metric.llm = llm
         if hasattr(metric, "embeddings"):

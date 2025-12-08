@@ -61,7 +61,7 @@ def evaluate_rag_system(
     colbert_model: str = "bert-base-uncased",
     generator: Optional[Generator] = None,
     use_ragas: bool = False,
-    ragas_model: str = "gpt-4o-mini",
+    ragas_model: str = "local",
     embedding_model: Optional[str] = None,
 ):
     """
@@ -78,7 +78,7 @@ def evaluate_rag_system(
         colbert_model: Model name for ColBERT reranker (default: "bert-base-uncased")
         generator: Optional Generator instance for answer generation (required for RAGAS)
         use_ragas: Whether to compute RAGAS metrics (requires generator)
-        ragas_model: Model name for RAGAS judge (default: "gpt-4o-mini" for OpenAI API)
+        ragas_model: Model name for RAGAS judge (default: "local")
         embedding_model: Embedding model name for RAGAS metrics (default: uses same as FAISS index)
     """
     test_queries = load_test_queries(queries_file, max_queries)
@@ -100,6 +100,9 @@ def evaluate_rag_system(
 
         # RAGAS metrics totals
         ragas_totals = {}
+
+        # For RAGAS: collect all queries first, then batch evaluate
+        ragas_eval_data = [] if use_ragas and generator else None
 
         # Use tqdm to show progress
         for i, query_data in tqdm(
@@ -142,26 +145,21 @@ def evaluate_rag_system(
             # Extract contexts for RAGAS
             contexts = [doc.page_content for doc in search_results]
 
-            # Generate answer and compute RAGAS metrics if requested
+            # Generate answer and prepare for batch RAGAS evaluation
             if use_ragas and generator:
                 print(f"Query {i-1} running RAGAS generator...")
                 prompt = create_rag_prompt(query_text, contexts)
                 answer = generator.generate(prompt, max_tokens=512, temperature=0.7)
 
-                ragas_scores = compute_ragas_metrics(
-                    question=query_text,
-                    contexts=contexts,
-                    answer=answer,
-                    ground_truth=golden_answer,
-                    model_name=ragas_model,
-                    embedding_model=embedding_model,
+                # Collect data for batch evaluation
+                ragas_eval_data.append(
+                    {
+                        "question": query_text,
+                        "contexts": contexts,
+                        "answer": answer,
+                        "ground_truth": golden_answer or "",
+                    }
                 )
-
-                # Accumulate RAGAS metrics
-                for metric_name, score in ragas_scores.items():
-                    if metric_name not in ragas_totals:
-                        ragas_totals[metric_name] = 0.0
-                    ragas_totals[metric_name] += score
 
             relevant_found = 0
             relevant_positions = []
@@ -209,6 +207,26 @@ def evaluate_rag_system(
             total_ndcg_at_k += ndcg_at_k
             total_latency_at_k += latency
 
+        # Batch evaluate RAGAS metrics (much faster than one-by-one)
+        if use_ragas and generator and ragas_eval_data:
+            print(
+                f"Batch evaluating RAGAS metrics for {len(ragas_eval_data)} queries..."
+            )
+            from src.eval.llm_metrics import compute_ragas_metrics_batch
+
+            ragas_scores_list = compute_ragas_metrics_batch(
+                eval_data=ragas_eval_data,
+                model_name=ragas_model,
+                embedding_model=embedding_model,
+            )
+
+            # Accumulate RAGAS metrics
+            for ragas_scores in ragas_scores_list:
+                for metric_name, score in ragas_scores.items():
+                    if metric_name not in ragas_totals:
+                        ragas_totals[metric_name] = 0.0
+                    ragas_totals[metric_name] += score
+
         total_time = total_latency_at_k
         throughput = total_queries / total_time if total_time > 0 else 0.0  # QPS
 
@@ -224,6 +242,8 @@ def evaluate_rag_system(
         if use_ragas and ragas_totals:
             for metric_name, total in ragas_totals.items():
                 results[k][f"avg_{metric_name}"] = total / total_queries
+                results[k][f"total_{metric_name}"] = total
+                results[k][f"count_{metric_name}"] = total_queries
     results["estimated_memory_usage_MB"] = (
         vectorstore.index.ntotal * vectorstore.index.d * 4 / (1024 * 1024)
     )

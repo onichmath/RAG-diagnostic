@@ -247,7 +247,7 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
             "text-generation",
             model=shared_model,
             tokenizer=shared_tokenizer,
-            max_new_tokens=2048,  # Increased for complete JSON generation
+            # max_new_tokens=2048,  # Increased for complete JSON generation
             do_sample=False,
             return_full_text=False,
         )
@@ -283,7 +283,7 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=2048,  # Increased for complete JSON generation
+        # max_new_tokens=2048,  # Increased for complete JSON generation
         do_sample=False,
         return_full_text=False,
     )
@@ -350,12 +350,116 @@ def _select_metrics(
     return selected
 
 
+def compute_ragas_metrics_batch(
+    eval_data: List[Dict[str, Any]],
+    model_name: str = "local",
+    embedding_model: Optional[str] = None,
+    metrics: Optional[List[str]] = [
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    ],
+) -> List[Dict[str, float]]:
+    """
+    Compute RAGAS metrics for multiple query-answer pairs in batch (much faster).
+
+    Args:
+        eval_data: List of dicts, each with keys: "question", "contexts", "answer", "ground_truth"
+        model_name: Model name (see compute_ragas_metrics for options)
+        embedding_model: Embedding model for RAGAS metrics
+        metrics: Which metrics to compute
+
+    Returns:
+        List of dicts, each mapping metric name -> score (0.0–1.0)
+    """
+    if metrics is None:
+        metrics = DEFAULT_METRICS
+
+    if not eval_data:
+        return []
+
+    llm = _build_llm(model_name)
+    embeddings = _build_embeddings(embedding_model)
+    selected_metrics = _select_metrics(metrics, llm, embeddings)
+
+    if not selected_metrics:
+        return [{}] * len(eval_data)
+
+    # Create dataset with all queries at once
+    dataset = Dataset.from_list(eval_data)
+
+    # Evaluate all at once (much faster than one-by-one)
+    result = evaluate(
+        dataset=dataset,
+        metrics=selected_metrics,
+    )
+
+    # Extract scores for all queries
+    all_scores = []
+
+    if hasattr(result, "to_pandas"):
+        df = result.to_pandas()
+        for idx in range(len(eval_data)):
+            scores = {}
+            for name in metrics:
+                if name in df.columns:
+                    scores[name] = float(df[name].iloc[idx])
+                else:
+                    raise ValueError(
+                        f"Metric '{name}' not found in RAGAS results. Available columns: {df.columns.tolist()}"
+                    )
+            all_scores.append(scores)
+    elif hasattr(result, "column_names"):
+        for idx in range(len(eval_data)):
+            scores = {}
+            for name in metrics:
+                if name in result.column_names:
+                    value = result[name][idx]
+                    scores[name] = float(value)
+                else:
+                    raise ValueError(
+                        f"Metric '{name}' not found in RAGAS results. Available columns: {result.column_names}"
+                    )
+            all_scores.append(scores)
+    elif hasattr(result, "__getitem__"):
+        for idx in range(len(eval_data)):
+            scores = {}
+            for name in metrics:
+                if name in result:
+                    value = (
+                        result[name][idx]
+                        if isinstance(result[name], list)
+                        else result[name]
+                    )
+                    scores[name] = float(value)
+                else:
+                    raise ValueError(f"Metric '{name}' not found in RAGAS results")
+            all_scores.append(scores)
+    else:
+        # Fallback: assume single result per query
+        for idx in range(len(eval_data)):
+            scores = {}
+            for name in metrics:
+                if hasattr(result, name):
+                    value = getattr(result, name)
+                    if isinstance(value, (list, tuple)) and len(value) > idx:
+                        scores[name] = float(value[idx])
+                    else:
+                        scores[name] = float(value) if idx == 0 else 0.0
+                else:
+                    raise ValueError(f"Metric '{name}' not found in RAGAS results")
+            all_scores.append(scores)
+
+    return all_scores
+
+
 def compute_ragas_metrics(
     question: str,
     contexts: List[str],
     answer: str,
     ground_truth: str,
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "local",
     embedding_model: Optional[str] = None,
     metrics: Optional[List[str]] = [
         "faithfulness",
@@ -373,8 +477,7 @@ def compute_ragas_metrics(
         answer: Generated answer from your RAG system.
         ground_truth: Gold answer (empty string if not available).
         model_name:
-            - "gpt-4o-mini" (default, OpenAI API, requires OPENAI_API_KEY)
-            - "local" uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ
+            - "local" (default) uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ
             - HuggingFace model name (e.g., "microsoft/phi-2")
             - "openai:gpt-4" or "gpt-4" for OpenAI API (requires OPENAI_API_KEY)
         embedding_model: Embedding model for RAGAS metrics (default: uses _DEFAULT_EMBEDDING_MODEL).

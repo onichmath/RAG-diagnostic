@@ -15,7 +15,7 @@ import math
 from typing import Optional
 from matplotlib import pyplot as plt
 import seaborn as sns
-import tqdm
+from tqdm import tqdm
 
 
 def load_test_queries(queries_file: Path, max_queries: int):

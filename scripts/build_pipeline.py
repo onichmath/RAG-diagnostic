@@ -204,7 +204,7 @@ def parse_args():
         "--ragas-model",
         type=str,
         default="local",
-        help="Model name for RAGAS judge (default: 'local' uses microsoft/phi-2)",
+        help="Model name for RAGAS judge (default: 'local' uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ)",
     )
 
     parser.add_argument(

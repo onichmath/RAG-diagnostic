@@ -37,9 +37,8 @@ except ImportError:
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
 
-# Default model - same as llm_title_rerank.py
-# _DEFAULT_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
-_DEFAULT_MODEL_NAME = "microsoft/phi-2"
+# Default model for RAGAS judge (optimized for RAGAS evaluation)
+_DEFAULT_MODEL_NAME = "vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ"
 # Default embedding model for RAGAS metrics
 _DEFAULT_EMBEDDING_MODEL = "thenlper/gte-small"
 
@@ -70,10 +69,11 @@ DEFAULT_METRICS = [
 
 def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     """
-    Create a local HuggingFace LLM for Ragas, reusing model from llm_title_rerank.py if available.
+    Create a local HuggingFace LLM for Ragas.
+    Uses a different default model than the LLM reranker (optimized for RAGAS).
 
     Args:
-        model_name: Model name or "local" to use default (meta-llama/Llama-3.2-3B-Instruct)
+        model_name: Model name or "local" to use default (vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ)
 
     Returns:
         HuggingFacePipeline LLM instance
@@ -114,18 +114,21 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         return llm
 
     # Otherwise, load new model
-    print(f"Loading local model: {model_name}...")
+    print(f"Loading RAGAS judge model: {model_name}...")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    # GPTQ models need trust_remote_code=True
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
     # Set pad_token if not already set
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # GPTQ models typically use float16 and need trust_remote_code
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float32,
+        torch_dtype=torch.float16,  # GPTQ models use float16
         device_map="auto",
+        trust_remote_code=True,
     )
 
     # Create pipeline
@@ -133,7 +136,7 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=512,
+        max_new_tokens=2048,  # Increased for complete JSON generation
         do_sample=False,
         return_full_text=False,
     )
@@ -222,7 +225,7 @@ def compute_ragas_metrics(
         contexts: List of retrieved context strings for this question.
         answer: Generated answer from your RAG system.
         ground_truth: Gold answer (empty string if not available).
-        model_name: Local model name (default: "local" uses meta-llama/Llama-3.2-3B-Instruct).
+        model_name: Local model name (default: "local" uses vibrantlabsai/Ragas-critic-llm-Qwen1.5-GPTQ).
                     Can also specify any HuggingFace model name.
         embedding_model: Embedding model for RAGAS metrics (default: uses _DEFAULT_EMBEDDING_MODEL).
         metrics: Which metrics to compute. Defaults to a standard set:
@@ -250,6 +253,9 @@ def compute_ragas_metrics(
     }
     dataset = Dataset.from_list([eval_row])
 
+    # RAGAS has a default timeout of 180 seconds (3 minutes) per metric
+    # If your model is slow, you may need to set RAGAS_TIMEOUT environment variable
+    # or use a faster model (e.g., GPTQ quantized models)
     result = evaluate(
         dataset=dataset,
         metrics=selected_metrics,

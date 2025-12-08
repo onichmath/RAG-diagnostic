@@ -247,7 +247,7 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
             "text-generation",
             model=shared_model,
             tokenizer=shared_tokenizer,
-            # max_new_tokens=2048,  # Increased for complete JSON generation
+            max_new_tokens=2048,  # Increased for complete JSON generation
             do_sample=False,
             return_full_text=False,
         )
@@ -283,7 +283,7 @@ def _build_llm(model_name: str = "local") -> Union[HuggingFacePipeline, Any]:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        # max_new_tokens=2048,  # Increased for complete JSON generation
+        max_new_tokens=2048,  # Increased for complete JSON generation
         do_sample=False,
         return_full_text=False,
     )

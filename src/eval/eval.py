@@ -165,7 +165,7 @@ def evaluate_rag_system(
             relevant_positions = []
             relevance_scores = []
 
-            for i, result in enumerate(search_results):
+            for j, result in enumerate(search_results):
                 result_title = result.metadata.get("title", "").lower()
                 expected_doc_patterns = get_expected_doc_patterns(expected_gold_docs)
                 pattern_match = any(
@@ -176,7 +176,7 @@ def evaluate_rag_system(
                 # if (result.metadata.get('source') == expected_source):
                 if pattern_match and result_source == expected_source:
                     relevant_found += 1
-                    relevant_positions.append(i + 1)
+                    relevant_positions.append(j + 1)
                     relevance_scores.append(1.0)
                 else:
                     relevance_scores.append(0.0)
@@ -186,9 +186,9 @@ def evaluate_rag_system(
             def dcg_at_k(relevance_scores, k):
                 """Calculate DCG@k with proper log scaling"""
                 dcg = 0.0
-                for i in range(min(k, len(relevance_scores))):
-                    if relevance_scores[i] > 0:
-                        dcg += relevance_scores[i] / math.log2(i + 2)
+                for pos in range(min(k, len(relevance_scores))):
+                    if relevance_scores[pos] > 0:
+                        dcg += relevance_scores[pos] / math.log2(pos + 2)
                 return dcg
 
             def idcg_at_k(relevance_scores, k):

@@ -38,7 +38,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from ragas.embeddings import HuggingFaceEmbeddings as RagasHuggingFaceEmbeddings
 
 # Default model - same as llm_title_rerank.py
-_DEFAULT_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
+# _DEFAULT_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
+_DEFAULT_MODEL_NAME = "microsoft/phi-2"
 # Default embedding model for RAGAS metrics
 _DEFAULT_EMBEDDING_MODEL = "thenlper/gte-small"
 
@@ -132,7 +133,7 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=2048,
+        max_new_tokens=512,
         do_sample=False,
         return_full_text=False,
     )

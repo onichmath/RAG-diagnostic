@@ -112,11 +112,14 @@ def evaluate_rag_system(
             golden_answer = query_data.get("golden_answer", "")
 
             expected_source = "guideline"
-
+            
+            print(f"Query {i-1} running similarity search...")
             time_start = time()
             search_results = vectorstore.similarity_search(query_text, k=k)
             # ColBERT Reranker
+            
             if use_colbert_reranker:
+                print(f"Query {i-1} running ColBERT reranker...")
                 # We rerank whatever FAISS found
                 search_results = rerank_with_colbert(
                     query=query_text,
@@ -127,6 +130,7 @@ def evaluate_rag_system(
 
             # Title-Based Local LLM Reranker
             if use_llm_reranker:
+                print(f"Query {i-1} running LLM reranker...")
                 search_results = rerank_by_title_llm(
                     query=query_text,
                     docs=search_results,
@@ -140,6 +144,7 @@ def evaluate_rag_system(
 
             # Generate answer and compute RAGAS metrics if requested
             if use_ragas and generator:
+                print(f"Query {i-1} running RAGAS generator...")
                 prompt = create_rag_prompt(query_text, contexts)
                 answer = generator.generate(prompt, max_tokens=512, temperature=0.7)
 

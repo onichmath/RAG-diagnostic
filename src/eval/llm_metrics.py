@@ -100,7 +100,7 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
             "text-generation",
             model=shared_model,
             tokenizer=shared_tokenizer,
-            max_new_tokens=2048,
+            max_new_tokens=512,
             do_sample=False,
             return_full_text=False,
         )
@@ -136,7 +136,7 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=2048,  # Increased for complete JSON generation
+        max_new_tokens=512,  # Increased for complete JSON generation
         do_sample=False,
         return_full_text=False,
     )

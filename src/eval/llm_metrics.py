@@ -1,4 +1,6 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+import json
+import re
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
@@ -67,6 +69,76 @@ DEFAULT_METRICS = [
 ]
 
 
+class JSONSanitizingLLM(HuggingFacePipeline):
+    """
+    A wrapper around HuggingFacePipeline that sanitizes the output to ensure it's valid JSON.
+    This is necessary because some models (like Qwen) may add prefixes or other non-JSON text.
+    """
+
+    def _call(
+        self, prompt: str, stop: Optional[List[str]] = None, **kwargs: Any
+    ) -> str:
+        raw_output = super()._call(prompt, stop=stop, **kwargs)
+
+        # Attempt to extract JSON from the raw output
+        json_str = self._extract_json(raw_output)
+
+        if json_str:
+            return json_str
+        else:
+            # If no valid JSON is found, return the raw output (RAGAS will likely error)
+            print(
+                f"[JSONSanitizingLLM WARNING] No valid JSON found in output. Raw: {raw_output[:200]}..."
+            )
+            return raw_output
+
+    def _extract_json(self, text: str) -> Optional[str]:
+        """
+        Extract valid JSON from model output, handling common formatting issues.
+
+        Handles cases like:
+        - "1. {...}" -> "{...}"
+        - "1``` {...}" -> "{...}"
+        - "1, {...}" -> "{...}"
+        - "```json {...} ```" -> "{...}"
+        """
+        # Strategy 1: Find first '{' and last '}' or first '[' and last ']'
+        # and try to parse the substring
+        for start_char, end_char in [("{", "}"), ("[", "]")]:
+            try:
+                start_idx = text.find(start_char)
+                end_idx = text.rfind(end_char)
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    potential_json = text[start_idx : end_idx + 1]
+                    json.loads(potential_json)  # Validate
+                    return potential_json
+            except json.JSONDecodeError:
+                pass
+
+        # Strategy 2: Regex to find common JSON patterns (e.g., inside ```json ... ```)
+        match = re.search(r"```json\s*(\{.*\}|\[.*\])\s*```", text, re.DOTALL)
+        if match:
+            try:
+                json_content = match.group(1)
+                json.loads(json_content)  # Validate
+                return json_content
+            except json.JSONDecodeError:
+                pass
+
+        # Strategy 3: Remove common prefixes and try to parse
+        # Examples: "1. {...", "1``` {...", "1, {..."
+        cleaned_text = re.sub(
+            r"^\s*(\d+\.?\s*|```\s*|\d+,\s*|```json\s*)", "", text, count=1
+        )
+        try:
+            json.loads(cleaned_text)  # Validate
+            return cleaned_text
+        except json.JSONDecodeError:
+            pass
+
+        return None
+
+
 def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
     """
     Create a local HuggingFace LLM for Ragas.
@@ -100,13 +172,13 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
             "text-generation",
             model=shared_model,
             tokenizer=shared_tokenizer,
-            max_new_tokens=512,
+            max_new_tokens=2048,  # Increased for complete JSON generation
             do_sample=False,
             return_full_text=False,
         )
 
-        # Wrap in LangChain HuggingFacePipeline
-        llm = HuggingFacePipeline(pipeline=pipe)
+        # Wrap in JSONSanitizingLLM to handle JSON parsing issues
+        llm = JSONSanitizingLLM(pipeline=pipe)
 
         # Cache it
         _model_cache[model_name] = llm
@@ -136,13 +208,13 @@ def _build_llm(model_name: str = "local") -> HuggingFacePipeline:
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=512,  # Increased for complete JSON generation
+        max_new_tokens=2048,  # Increased for complete JSON generation
         do_sample=False,
         return_full_text=False,
     )
 
-    # Wrap in LangChain HuggingFacePipeline
-    llm = HuggingFacePipeline(pipeline=pipe)
+    # Wrap in JSONSanitizingLLM to handle JSON parsing issues
+    llm = JSONSanitizingLLM(pipeline=pipe)
 
     # Cache it
     _model_cache[model_name] = llm

@@ -8,6 +8,7 @@ from src.reranker.llm_title_rerank import rerank_by_title_llm
 from src.reranker.colbert_rerank import rerank_with_colbert
 from src.reader.reader import Generator, create_rag_prompt
 from src.eval.llm_metrics import compute_ragas_metrics_batch
+from src.query.query_transformer import QueryTransformer
 
 from time import time
 import json
@@ -51,14 +52,24 @@ def get_expected_doc_patterns(expected_docs: list):
 
 # def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list):
 def evaluate_rag_system(
+    
     index_path: Path,
+    
     queries_file: Path,
+    
     max_queries: int,
+    
     k_array: list,
+    
     use_llm_reranker: bool = False,
+    
     llm_model: str = "local",
+    
     use_colbert_reranker: bool = False,
     colbert_model: str = "bert-base-uncased",
+    query_transform_model: str = "gemini-2.5-flash",
+    query_transform_provider: str = "auto",
+,
     generator: Optional[Generator] = None,
     use_ragas: bool = False,
     ragas_model: str = "local",
@@ -80,9 +91,25 @@ def evaluate_rag_system(
         use_ragas: Whether to compute RAGAS metrics (requires generator)
         ragas_model: Model name for RAGAS judge (default: "local")
         embedding_model: Embedding model name for RAGAS metrics (default: uses same as FAISS index)
+    
+    Args:
+        index_path: Path to FAISS index
+        queries_file: Path to JSON file with test queries
+        max_queries: Maximum number of queries to evaluate
+        k_array: List of k values for precision/NDCG calculation
+        use_llm_reranker: Enable local LLM title-based reranker
+        llm_model: Model for LLM reranker (ignored, kept for compatibility)
+        use_colbert_reranker: Enable ColBERT reranker
+        colbert_model: Model for ColBERT reranker
+        query_transform_model: Model for query transformation (e.g., "gemini-2.5-flash")
+        query_transform_provider: Provider for query transformation ("auto", "colab", "gemini")
     """
     test_queries = load_test_queries(queries_file, max_queries)
     vectorstore = load_faiss_index(index_path)
+    transformer = QueryTransformer(
+        model_name=query_transform_model,
+        provider=query_transform_provider,
+    )
     # Warm start
     for i in range(1):
         vectorstore.similarity_search("test", k=10)
@@ -118,7 +145,9 @@ def evaluate_rag_system(
 
             print(f"Query {i-1} running similarity search...")
             time_start = time()
-            search_results = vectorstore.similarity_search(query_text, k=k)
+            transformed = transformer.transform(query_text)
+            candidate_queries = transformed.candidate_queries()
+            search_results = multi_query_similarity_search(vectorstore, candidate_queries, k)
             # ColBERT Reranker
 
             if use_colbert_reranker:
@@ -272,6 +301,31 @@ def load_results(results_file: Path):
     """
     with open(results_file, "r") as f:
         return json.load(f)
+
+
+def multi_query_similarity_search(vectorstore, queries, k):
+    """
+    Run similarity search over multiple transformed queries and merge results.
+
+    - Issues each query variant in order.
+    - Deduplicates by document id to avoid over-counting the same chunk.
+    - Returns at most k documents, preserving the earliest high-recall hits.
+    """
+    collected = []
+    seen = set()
+
+    for query in queries:
+        hits = vectorstore.similarity_search(query, k=k)
+        for doc in hits:
+            doc_id = doc.metadata.get('doc_id') or doc.metadata.get('id') or id(doc)
+            if doc_id in seen:
+                continue
+            seen.add(doc_id)
+            collected.append(doc)
+            if len(collected) >= k:
+                return collected
+
+    return collected[:k]
 
 
 if __name__ == "__main__":

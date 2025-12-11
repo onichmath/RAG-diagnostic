@@ -1,0 +1,38 @@
+{
+  "5": {
+    "avg_precision_at_k": 0.62,
+    "avg_ndcg_at_k": 0.658,
+    "avg_latency_ms": 42.5,
+    "throughput_qps": 23.53,
+    "total_queries": 10
+  },
+  "10": {
+    "avg_precision_at_k": 0.62,
+    "avg_ndcg_at_k": 0.672,
+    "avg_latency_ms": 35.2,
+    "throughput_qps": 28.41,
+    "total_queries": 10
+  },
+  "20": {
+    "avg_precision_at_k": 0.625,
+    "avg_ndcg_at_k": 0.705,
+    "avg_latency_ms": 33.8,
+    "throughput_qps": 29.59,
+    "total_queries": 10
+  },
+  "50": {
+    "avg_precision_at_k": 0.604,
+    "avg_ndcg_at_k": 0.712,
+    "avg_latency_ms": 34.1,
+    "throughput_qps": 29.33,
+    "total_queries": 10
+  },
+  "100": {
+    "avg_precision_at_k": 0.582,
+    "avg_ndcg_at_k": 0.718,
+    "avg_latency_ms": 34.5,
+    "throughput_qps": 28.99,
+    "total_queries": 10
+  },
+  "estimated_memory_usage_MB": 232.58
+}

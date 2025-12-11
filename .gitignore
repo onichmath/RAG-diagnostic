@@ -1,7 +1,9 @@
 data/guidelines/
-
 data/indices/
-
 data/corpus_raw/
-
+env/
+*.pyc
+*.json
+!data/*.json
+*.arrow
 

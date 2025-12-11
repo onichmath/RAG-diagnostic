@@ -1,0 +1,49 @@
+# Core scientific stack
+numpy
+pandas
+scipy
+scikit-learn
+
+# PyTorch
+torch
+torchvision
+
+# Visualization
+matplotlib
+seaborn
+
+# Jupyter
+jupyter
+jupyterlab
+ipykernel
+
+# Utilities
+tqdm
+pyyaml
+
+# LangChain ecosystem
+langchain
+langchain-community
+langchain-core
+langchain-huggingface
+langchain-text-splitters
+
+# HuggingFace
+transformers
+datasets
+huggingface-hub
+accelerate
+sentence-transformers
+sentencepiece
+tokenizers
+safetensors
+
+# Vector store
+faiss-cpu
+
+# PDF processing
+pypdf
+pymupdf
+
+# Other
+python-dotenv

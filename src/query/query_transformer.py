@@ -1,5 +1,6 @@
 """
-Query transformation utilities built on google.colab.ai models.
+Query transformation utilities built on google.colab.ai models with a fallback
+to the Gemini API (google.genai) when Colab AI is unavailable.
 
 Features:
 - Query rewriting: normalize a clinical query into a concise, unambiguous form.
@@ -7,7 +8,7 @@ Features:
 - Query decomposition: break complex questions into atomic sub-questions.
 - Step-back prompting: add a higher-level version to pull broader context.
 
-If google.colab.ai is unavailable, the transformer falls back to pass-through
+If neither provider is available, the transformer falls back to pass-through
 behavior so retrieval still works.
 """
 
@@ -15,6 +16,7 @@ from dataclasses import dataclass, field
 import json
 import logging
 from typing import List, Optional
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,8 @@ logger = logging.getLogger(__name__)
 # imports (like HuggingFace models) happen between import and first call.
 _ai_module = None
 _ai_import_attempted = False
+_genai_import_attempted = False
+_genai_client = None
 
 
 def _get_ai_module():
@@ -42,6 +46,36 @@ def _get_ai_module():
         _ai_module = None
     
     return _ai_module
+
+
+def _get_genai_client():
+    """
+    Lazy import + client construction for google.genai (Gemini API).
+    The client looks for GEMINI_API_KEY in the environment.
+    """
+    global _genai_import_attempted, _genai_client
+
+    if _genai_import_attempted:
+        return _genai_client
+
+    _genai_import_attempted = True
+
+    try:
+        from google import genai  # type: ignore
+
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            logger.warning("GEMINI_API_KEY not set; Gemini fallback disabled")
+            _genai_client = None
+            return None
+
+        _genai_client = genai.Client(api_key=api_key)
+        logger.info("google.genai client initialized for Gemini fallback")
+    except Exception as exc:  # pragma: no cover - external dependency
+        logger.warning("google.genai not available: %s", exc)
+        _genai_client = None
+
+    return _genai_client
 
 
 @dataclass
@@ -87,7 +121,8 @@ class QueryTransformResult:
 
 class QueryTransformer:
     """
-    Generates multiple query variants using a single call to google.colab.ai.
+    Generates multiple query variants using google.colab.ai, with a Gemini
+    fallback when Colab AI is not available.
     """
 
     def __init__(
@@ -99,19 +134,14 @@ class QueryTransformer:
         self.model_name = model_name
         self.max_expansions = max_expansions
         self.max_subqueries = max_subqueries
-        # Note: enabled is checked lazily via _get_ai_module() at call time
+        # Note: availability is checked lazily via _get_ai_module/_get_genai_client
 
     def transform(self, query: str) -> QueryTransformResult:
         """
-        Run the transformation stack. Falls back to identity if colab.ai is absent.
+        Run the transformation stack. Falls back to identity if both providers are absent.
         """
-        # Lazy check: get ai module at call time (not import time)
-        ai = _get_ai_module()
-        if ai is None:
-            return QueryTransformResult(original=query)
-
         prompt = self._build_prompt(query)
-        raw = self._call_model(prompt, ai)
+        raw = self._call_model(prompt)
         parsed = self._parse_response(raw, query)
 
         return parsed
@@ -132,13 +162,50 @@ Keep answers short (<=20 words each). Return ONLY JSON, no prose.
 User query: "{query}"
 """
 
-    def _call_model(self, prompt: str, ai) -> str:
-        """Isolate the model invocation for logging and testing."""
+    def _call_model(self, prompt: str) -> str:
+        """
+        Try Colab AI first; if unavailable or failing, fall back to Gemini API.
+        """
+        # Attempt Colab AI
+        ai = _get_ai_module()
+        if ai is not None:
+            text = self._call_colab_ai(prompt, ai)
+            if text:
+                return text
+
+        # Attempt Gemini API
+        client = _get_genai_client()
+        if client is not None:
+            text = self._call_gemini(prompt, client)
+            if text:
+                return text
+
+        # Final fallback: empty string (caller will pass through original query)
+        return ""
+
+    def _call_colab_ai(self, prompt: str, ai) -> str:
+        """Invoke google.colab.ai."""
         try:
             return ai.generate_text(prompt, model_name=self.model_name)
         except Exception as exc:  # pragma: no cover - external dependency
-            logger.warning("Query transform generation failed: %s", exc)
+            logger.warning("Query transform generation failed via Colab AI: %s", exc)
             return ""
+
+    def _call_gemini(self, prompt: str, client) -> str:
+        """Invoke the Gemini API through google.genai."""
+        try:
+            response = client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+            )
+            # Some client versions wrap text in .text; others in .candidates
+            if hasattr(response, "text"):
+                return response.text or ""
+            if hasattr(response, "candidates") and response.candidates:
+                return getattr(response.candidates[0], "text", "") or ""
+        except Exception as exc:  # pragma: no cover - external dependency
+            logger.warning("Query transform generation failed via Gemini API: %s", exc)
+        return ""
 
     def _parse_response(
         self,
@@ -203,4 +270,3 @@ User query: "{query}"
             seen.add(key)
             cleaned.append(v_clean)
         return cleaned
-

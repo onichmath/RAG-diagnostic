@@ -1,6 +1,6 @@
 # Query Transformation Stack
 
-This module adds query-side transformations that run before retrieval. It uses `google.colab.ai` models to improve recall and ranking without rebuilding the FAISS index.
+This module adds query-side transformations that run before retrieval. It tries `google.colab.ai` first, then falls back to Gemini (`google.genai`) if `google.colab.ai` is unavailable, to improve recall/ranking without rebuilding the FAISS index.
 
 ## What it does
 - **Rewrite**: Normalize the user question into a concise, unambiguous clinical query.
@@ -8,7 +8,7 @@ This module adds query-side transformations that run before retrieval. It uses `
 - **Decomposition**: Break complex questions into atomic sub-questions for targeted retrieval.
 - **Step-back**: Generate a higher-level variant to pull guideline-style context.
 
-`QueryTransformer` asks a single Colab AI model call to return all of the above as JSON, parses it, and builds a deduplicated list of candidate queries. Retrieval then issues each variant in order and merges results (deduped by `doc_id`) until `k` results are collected.
+`QueryTransformer` asks a single model call to return all of the above as JSON (Colab AI first, Gemini fallback), parses it, and builds a deduplicated list of candidate queries. Retrieval then issues each variant in order and merges results (deduped by `doc_id`) until `k` results are collected.
 
 ## How it is used in evaluation
 `src/eval/eval.py` now:
@@ -18,9 +18,23 @@ This module adds query-side transformations that run before retrieval. It uses `
 
 The rest of the pipeline (indexing, reranking, metrics) is unchanged.
 
-## Colab AI dependency and fallbacks
-- The code attempts `from google.colab import ai` with the default model `google/gemini-2.5-flash`.
-- If Colab AI is unavailable, the transformer falls back to pass-through behavior so evaluation still runs.
+## Runtime dependency and fallbacks
+- First tries `google.colab.ai` (`google/gemini-2.5-flash` by default).
+- If Colab AI is unavailable, falls back to the Gemini API via `google.genai`, which requires `GEMINI_API_KEY` in the environment.
+- If neither is available or calls fail, the transformer becomes a no-op so evaluation still runs.
+
+### Setting `GEMINI_API_KEY` in Colab (avoid storing in repo)
+Run once per session before `build_pipeline.py`:
+```python
+import os
+# Option 1: paste manually (not persisted in files)
+os.environ["GEMINI_API_KEY"] = "your-key-here"
+
+# Option 2: use Colab's secret storage (preferred; key not visible in notebook)
+from google.colab import userdata
+os.environ["GEMINI_API_KEY"] = userdata.get("GEMINI_API_KEY")
+```
+The code reads the key from the environment at runtime; nothing is committed to git.
 
 ## Extending or tuning
 - Adjust `max_expansions`, `max_subqueries`, or `model_name` when constructing `QueryTransformer`.

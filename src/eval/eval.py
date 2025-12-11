@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.retriever.faiss_builder import load_faiss_index
 from src.reranker.llm_title_rerank import rerank_by_title_llm
 from src.reranker.colbert_rerank import rerank_with_colbert
+from src.query.query_transformer import QueryTransformer
 
 from time import time
 import json
@@ -47,6 +48,7 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
     """
     test_queries = load_test_queries(queries_file, max_queries)
     vectorstore = load_faiss_index(index_path) 
+    transformer = QueryTransformer()
     # Warm start 
     for i in range(1):
         vectorstore.similarity_search("test", k=10)
@@ -66,7 +68,9 @@ def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, 
             expected_source = "guideline"
             
             time_start = time()
-            search_results = vectorstore.similarity_search(query_text, k=k)
+            transformed = transformer.transform(query_text)
+            candidate_queries = transformed.candidate_queries()
+            search_results = multi_query_similarity_search(vectorstore, candidate_queries, k)
             # ColBERT Reranker
             if use_colbert_reranker:
                 # We rerank whatever FAISS found
@@ -163,6 +167,31 @@ def load_results(results_file: Path):
     """
     with open(results_file, 'r') as f:
         return json.load(f)
+
+
+def multi_query_similarity_search(vectorstore, queries, k):
+    """
+    Run similarity search over multiple transformed queries and merge results.
+
+    - Issues each query variant in order.
+    - Deduplicates by document id to avoid over-counting the same chunk.
+    - Returns at most k documents, preserving the earliest high-recall hits.
+    """
+    collected = []
+    seen = set()
+
+    for query in queries:
+        hits = vectorstore.similarity_search(query, k=k)
+        for doc in hits:
+            doc_id = doc.metadata.get('doc_id') or doc.metadata.get('id') or id(doc)
+            if doc_id in seen:
+                continue
+            seen.add(doc_id)
+            collected.append(doc)
+            if len(collected) >= k:
+                return collected
+
+    return collected[:k]
     
 if __name__ == "__main__":
     results = load_results(Path("data/FAISS_evaluation_results.json"))

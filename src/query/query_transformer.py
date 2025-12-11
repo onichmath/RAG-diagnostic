@@ -1,0 +1,189 @@
+"""
+Query transformation utilities built on google.colab.ai models.
+
+Features:
+- Query rewriting: normalize a clinical query into a concise, unambiguous form.
+- Query expansion: produce alternate phrasings/synonyms to widen recall.
+- Query decomposition: break complex questions into atomic sub-questions.
+- Step-back prompting: add a higher-level version to pull broader context.
+
+If google.colab.ai is unavailable, the transformer falls back to pass-through
+behavior so retrieval still works.
+"""
+
+from dataclasses import dataclass, field
+import json
+import logging
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+try:
+    # google.colab.ai is only available in Colab runtimes.
+    from google.colab import ai
+
+    _HAS_COLAB_AI = True
+except Exception as exc:  # pragma: no cover - depends on environment
+    logger.warning("google.colab.ai not available: %s", exc)
+    ai = None
+    _HAS_COLAB_AI = False
+
+
+@dataclass
+class QueryTransformResult:
+    """Container for the structured outputs of query transformation."""
+
+    original: str
+    rewrite: Optional[str] = None
+    expansions: List[str] = field(default_factory=list)
+    decompositions: List[str] = field(default_factory=list)
+    step_back: Optional[str] = None
+
+    def candidate_queries(self) -> List[str]:
+        """
+        Build a deduplicated list of queries to issue against the retriever.
+
+        Order favors the rewritten query, then broader/alternate forms to
+        increase recall, while keeping the list compact.
+        """
+        ordered = [
+            self.rewrite or self.original,
+            self.step_back,
+            *self.expansions,
+            *self.decompositions,
+        ]
+        seen = set()
+        result = []
+        for q in ordered:
+            q_clean = (q or "").strip()
+            if not q_clean:
+                continue
+            key = q_clean.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(q_clean)
+
+        # Always ensure the original query is present.
+        if self.original.strip() and self.original.strip().lower() not in seen:
+            result.insert(0, self.original.strip())
+        return result
+
+
+class QueryTransformer:
+    """
+    Generates multiple query variants using a single call to google.colab.ai.
+    """
+
+    def __init__(
+        self,
+        model_name: str = "google/gemini-2.5-flash",
+        max_expansions: int = 5,
+        max_subqueries: int = 3,
+    ):
+        self.model_name = model_name
+        self.max_expansions = max_expansions
+        self.max_subqueries = max_subqueries
+        self.enabled = _HAS_COLAB_AI
+
+    def transform(self, query: str) -> QueryTransformResult:
+        """
+        Run the transformation stack. Falls back to identity if colab.ai is absent.
+        """
+        if not self.enabled:
+            return QueryTransformResult(original=query)
+
+        prompt = self._build_prompt(query)
+        raw = self._call_model(prompt)
+        parsed = self._parse_response(raw, query)
+
+        return parsed
+
+    def _build_prompt(self, query: str) -> str:
+        """
+        Craft a structured prompt asking the model to return JSON with all
+        transformation pieces in one shot to limit round trips.
+        """
+        return f"""
+You are assisting a clinical retrieval system. Given the user query, produce a JSON object with four fields:
+- "rewrite": one concise, professional reformulation that preserves intent.
+- "expansions": up to {self.max_expansions} alternate phrasings or key synonyms to improve recall.
+- "decompositions": up to {self.max_subqueries} atomic sub-questions that together answer the original.
+- "step_back": a broader, high-level version to fetch contextual guidance.
+
+Keep answers short (<=20 words each). Return ONLY JSON, no prose.
+User query: "{query}"
+"""
+
+    def _call_model(self, prompt: str) -> str:
+        """Isolate the model invocation for logging and testing."""
+        try:
+            return ai.generate_text(prompt, model_name=self.model_name)
+        except Exception as exc:  # pragma: no cover - external dependency
+            logger.warning("Query transform generation failed: %s", exc)
+            return ""
+
+    def _parse_response(
+        self,
+        response: str,
+        original_query: str,
+    ) -> QueryTransformResult:
+        """
+        Parse the model output into a QueryTransformResult, tolerating imperfect
+        JSON by applying simple recovery heuristics.
+        """
+        rewrite = None
+        expansions: List[str] = []
+        decompositions: List[str] = []
+        step_back = None
+
+        if response:
+            try:
+                # Extract JSON portion if extra text is present.
+                start = response.find("{")
+                end = response.rfind("}") + 1
+                json_blob = response[start:end] if start != -1 else response
+                payload = json.loads(json_blob)
+                rewrite = self._clean_str(payload.get("rewrite"))
+                expansions = self._clean_list(payload.get("expansions"))
+                decompositions = self._clean_list(payload.get("decompositions"))
+                step_back = self._clean_str(payload.get("step_back"))
+            except Exception as exc:
+                logger.warning("Failed to parse query transform output: %s", exc)
+
+        # Ensure sensible defaults when parsing fails.
+        rewrite = rewrite or original_query
+        return QueryTransformResult(
+            original=original_query,
+            rewrite=rewrite,
+            expansions=expansions,
+            decompositions=decompositions,
+            step_back=step_back,
+        )
+
+    @staticmethod
+    def _clean_str(value: Optional[str]) -> Optional[str]:
+        """Strip whitespace and ignore empty strings."""
+        if not value:
+            return None
+        value = value.strip()
+        return value or None
+
+    @staticmethod
+    def _clean_list(values: Optional[List[str]]) -> List[str]:
+        """Normalize list fields to a compact list of non-empty strings."""
+        if not values:
+            return []
+        cleaned = []
+        seen = set()
+        for v in values:
+            v_clean = (v or "").strip()
+            if not v_clean:
+                continue
+            key = v_clean.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(v_clean)
+        return cleaned
+

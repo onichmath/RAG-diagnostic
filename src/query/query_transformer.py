@@ -18,15 +18,30 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-try:
-    # google.colab.ai is only available in Colab runtimes.
-    from google.colab import ai
+# Lazy-loaded reference to google.colab.ai
+# We delay the import to avoid kernel connection issues when other heavy
+# imports (like HuggingFace models) happen between import and first call.
+_ai_module = None
+_ai_import_attempted = False
 
-    _HAS_COLAB_AI = True
-except Exception as exc:  # pragma: no cover - depends on environment
-    logger.warning("google.colab.ai not available: %s", exc)
-    ai = None
-    _HAS_COLAB_AI = False
+
+def _get_ai_module():
+    """Lazy import of google.colab.ai to ensure kernel is ready at call time."""
+    global _ai_module, _ai_import_attempted
+    
+    if _ai_import_attempted:
+        return _ai_module
+    
+    _ai_import_attempted = True
+    try:
+        from google.colab import ai
+        _ai_module = ai
+        logger.info("google.colab.ai loaded successfully")
+    except Exception as exc:
+        logger.warning("google.colab.ai not available: %s", exc)
+        _ai_module = None
+    
+    return _ai_module
 
 
 @dataclass
@@ -84,17 +99,19 @@ class QueryTransformer:
         self.model_name = model_name
         self.max_expansions = max_expansions
         self.max_subqueries = max_subqueries
-        self.enabled = _HAS_COLAB_AI
+        # Note: enabled is checked lazily via _get_ai_module() at call time
 
     def transform(self, query: str) -> QueryTransformResult:
         """
         Run the transformation stack. Falls back to identity if colab.ai is absent.
         """
-        if not self.enabled:
+        # Lazy check: get ai module at call time (not import time)
+        ai = _get_ai_module()
+        if ai is None:
             return QueryTransformResult(original=query)
 
         prompt = self._build_prompt(query)
-        raw = self._call_model(prompt)
+        raw = self._call_model(prompt, ai)
         parsed = self._parse_response(raw, query)
 
         return parsed
@@ -115,7 +132,7 @@ Keep answers short (<=20 words each). Return ONLY JSON, no prose.
 User query: "{query}"
 """
 
-    def _call_model(self, prompt: str) -> str:
+    def _call_model(self, prompt: str, ai) -> str:
         """Isolate the model invocation for logging and testing."""
         try:
             return ai.generate_text(prompt, model_name=self.model_name)

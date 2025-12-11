@@ -3,62 +3,74 @@
     {
       "query_id": "q001",
       "query_text": "What is the recommended treatment for community-acquired pneumonia in hospitalized adults?",
-      "expected_gold_docs": ["idsa_clinical_guideline_covid19"]
+      "expected_gold_docs": ["idsa_clinical_guideline_covid19"],
+      "golden_answer": "Hospitalized adults with community-acquired pneumonia should receive empiric antibiotics such as a β-lactam plus macrolide or a respiratory fluoroquinolone per guideline recommendations."
     },
     {
       "query_id": "q002", 
       "query_text": "What are the current guidelines for managing type 2 diabetes in adults?",
-      "expected_gold_docs": ["ada_soc_diabetes_2024"]
+      "expected_gold_docs": ["ada_soc_diabetes_2024"],
+      "golden_answer": "Current type 2 diabetes guidelines recommend individualized A1c targets and stepwise pharmacologic therapy beginning with metformin and adding agents based on comorbidities and risk."
     },
     {
       "query_id": "q003",
       "query_text": "What is the recommended treatment for acute ischemic stroke within 4.5 hours of symptom onset?",
-      "expected_gold_docs": ["aha_stroke_2021"]
+      "expected_gold_docs": ["aha_stroke_2021"],
+      "golden_answer": "Acute ischemic stroke within 4.5 hours should be treated with IV alteplase if eligible and rapid evaluation for thrombectomy when indicated."
     },
     {
       "query_id": "q004",
       "query_text": "How should atrial fibrillation be managed according to current guidelines?",
-      "expected_gold_docs": ["aha_acc_afib"]
+      "expected_gold_docs": ["aha_acc_afib"],
+      "golden_answer": "Atrial fibrillation management centers on rate or rhythm control and stroke prevention with anticoagulation based on CHA₂DS₂-VASc score."
     },
     {
       "query_id": "q005",
       "query_text": "What are the current recommendations for COVID-19 treatment in hospitalized patients?",
-      "expected_gold_docs": ["idsa_clinical_guideline_covid19"]
+      "expected_gold_docs": ["idsa_clinical_guideline_covid19"],
+      "golden_answer": "Hospitalized COVID-19 patients should receive severity-based therapy including oxygen, corticosteroids, and antivirals or immunomodulators as appropriate."
     },
     {
       "query_id": "q006",
       "query_text": "How should heart failure be managed in patients with reduced ejection fraction?",
-      "expected_gold_docs": ["acc_aha_hf"]
+      "expected_gold_docs": ["acc_aha_hf"],
+      "golden_answer": "Heart failure with reduced ejection fraction should be managed using guideline-directed medical therapy including ARNI/ACEI/ARB, β-blockers, MRAs, and SGLT2 inhibitors."
     },
     {
       "query_id": "q007",
       "query_text": "What are the guidelines for managing sepsis and septic shock?",
-      "expected_gold_docs": ["surviving_sepsis"]
+      "expected_gold_docs": ["surviving_sepsis"],
+      "golden_answer": "Sepsis and septic shock should be managed with early identification, prompt broad-spectrum antibiotics, fluid resuscitation, and vasopressors if needed."
     },
     {
       "query_id": "q008",
       "query_text": "What is the recommended approach for diabetes management in hospitalized patients?",
-      "expected_gold_docs": ["ada_soc_diabetes_2024"]
+      "expected_gold_docs": ["ada_soc_diabetes_2024"],
+      "golden_answer": "Hospitalized patients with diabetes should receive scheduled basal–bolus or basal-plus insulin regimens with glucose monitoring rather than sliding-scale insulin alone."
     },
     {
       "query_id": "q009",
       "query_text": "How should stroke prevention be managed in patients with atrial fibrillation?",
-      "expected_gold_docs": ["aha_acc_afib", "aha_stroke_2021"]
+      "expected_gold_docs": ["aha_acc_afib", "aha_stroke_2021"],
+      "golden_answer": "Stroke prevention in atrial fibrillation requires anticoagulation based on stroke-risk assessment and management of modifiable vascular risk factors."
     },
     {
       "query_id": "q010",
       "query_text": "What are the current recommendations for heart failure with preserved ejection fraction?",
-      "expected_gold_docs": ["acc_aha_hf"]
+      "expected_gold_docs": ["acc_aha_hf"],
+      "golden_answer": "Heart failure with preserved ejection fraction management focuses on diuresis for symptoms and comorbidity optimization, with SGLT2 inhibitors preferred when possible."
     },
     {
       "query_id": "q011",
       "query_text": "How should sepsis be diagnosed and treated according to current guidelines?",
-      "expected_gold_docs": ["surviving_sepsis"]
+      "expected_gold_docs": ["surviving_sepsis"],
+      "golden_answer": "Sepsis diagnosis and treatment require rapid recognition, cultures, early broad-spectrum antibiotics, fluids, and vasopressors for persistent hypotension."
     },
     {
       "query_id": "q012",
       "query_text": "What are the guidelines for diabetes screening and prevention?",
-      "expected_gold_docs": ["ada_soc_diabetes_2024"]
+      "expected_gold_docs": ["ada_soc_diabetes_2024"],
+      "golden_answer": "Diabetes screening and prevention guidelines emphasize regular testing for at-risk adults and lifestyle or pharmacologic interventions to delay or prevent onset."
     }
   ]
 }

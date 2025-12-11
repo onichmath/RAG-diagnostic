@@ -44,7 +44,17 @@ cd RAG-diagnostic
 conda env create -f env.yml
 ```
 
-### 2. Download Clinical Guidelines
+### 2. RAGAS Setup
+
+The evaluation pipeline uses RAGAS (Retrieval-Augmented Generation Assessment) for LLM-based evaluation metrics including faithfulness, answer relevancy, context precision, and context recall. By default, the system uses OpenAI's `gpt-4o-mini` model via the OpenAI API. To use OpenAI models, you must set the `OPENAI_API_KEY` environment variable:
+
+```bash
+export OPENAI_API_KEY='your-api-key-here'
+```
+
+If you prefer to use a local model instead, you can specify `--ragas-model local` when running the pipeline. For OpenAI support, ensure you have `ragas[openai]` installed (included in `env.yml`). The RAGAS evaluation runs in batch mode for improved performance.
+
+### 3. Download Clinical Guidelines
 
 **Important**: Clinical guideline PDFs are not included in the repository due to copyright restrictions. You need to download them separately:
 
@@ -76,7 +86,7 @@ conda env create -f env.yml
 # Save it as idsa_clinical_guidelines_covid19.pdf
 ```
 
-### 3. Run the Pipeline
+### 4. Run the Pipeline
 
 ```bash
 # Run complete pipeline with default settings

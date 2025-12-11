@@ -19,9 +19,13 @@ This module adds query-side transformations that run before retrieval. It tries 
 The rest of the pipeline (indexing, reranking, metrics) is unchanged.
 
 ## Runtime dependency and fallbacks
-- First tries `google.colab.ai` (`google/gemini-2.5-flash` by default).
+- First tries `google.colab.ai` (`gemini-2.5-flash` by default, automatically prefixed with `google/` for Colab AI).
 - If Colab AI is unavailable, falls back to the Gemini API via `google.genai`, which requires `GEMINI_API_KEY` in the environment.
 - If neither is available or calls fail, the transformer becomes a no-op so evaluation still runs.
+
+**Note on model names**: The `model_name` parameter accepts the base model name (e.g., `"gemini-2.5-flash"`). The code automatically handles the different formats required by each API:
+- Colab AI uses `"google/gemini-2.5-flash"` format
+- Gemini API uses `"gemini-2.5-flash"` format
 
 ### Setting `GEMINI_API_KEY` in Colab (avoid storing in repo)
 Run once per session before `build_pipeline.py`:

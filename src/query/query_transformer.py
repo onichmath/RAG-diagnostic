@@ -127,14 +127,30 @@ class QueryTransformer:
 
     def __init__(
         self,
-        model_name: str = "google/gemini-2.5-flash",
+        model_name: str = "gemini-2.5-flash",
         max_expansions: int = 5,
         max_subqueries: int = 3,
     ):
-        self.model_name = model_name
+        # Store raw model name (without provider prefix)
+        # Handles both "gemini-2.5-flash" and "google/gemini-2.5-flash" formats
+        self.model_name = self._extract_model_name(model_name)
         self.max_expansions = max_expansions
         self.max_subqueries = max_subqueries
         # Note: availability is checked lazily via _get_ai_module/_get_genai_client
+
+    @staticmethod
+    def _extract_model_name(model_name: str) -> str:
+        """
+        Extract the base model name from provider/model format.
+        
+        Examples:
+            "google/gemini-2.5-flash" -> "gemini-2.5-flash"
+            "gemini-2.5-flash" -> "gemini-2.5-flash"
+            "openai/gpt-4" -> "gpt-4"
+        """
+        if "/" in model_name:
+            return model_name.split("/", 1)[1]
+        return model_name
 
     def transform(self, query: str) -> QueryTransformResult:
         """
@@ -184,16 +200,26 @@ User query: "{query}"
         return ""
 
     def _call_colab_ai(self, prompt: str, ai) -> str:
-        """Invoke google.colab.ai."""
+        """Invoke google.colab.ai.
+        
+        Note: Colab AI expects model_name in "provider/model" format (e.g., "google/gemini-2.5-flash")
+        """
         try:
-            return ai.generate_text(prompt, model_name=self.model_name)
+            # Colab AI requires the "google/" prefix for Gemini models
+            colab_model_name = f"google/{self.model_name}"
+            return ai.generate_text(prompt, model_name=colab_model_name)
         except Exception as exc:  # pragma: no cover - external dependency
             logger.warning("Query transform generation failed via Colab AI: %s", exc)
             return ""
 
     def _call_gemini(self, prompt: str, client) -> str:
-        """Invoke the Gemini API through google.genai."""
+        """Invoke the Gemini API through google.genai.
+        
+        Note: google.genai expects model in "models/model-name" or "model-name" format,
+        NOT in "provider/model" format like Colab AI.
+        """
         try:
+            # google.genai can use just the model name (e.g., "gemini-2.5-flash")
             response = client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,

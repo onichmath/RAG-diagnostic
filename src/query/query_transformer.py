@@ -123,19 +123,45 @@ class QueryTransformer:
     """
     Generates multiple query variants using google.colab.ai, with a Gemini
     fallback when Colab AI is not available.
+    
+    Args:
+        model_name: Model to use (e.g., "gemini-2.5-flash"). Provider prefix is stripped.
+        max_expansions: Maximum number of query expansions to generate.
+        max_subqueries: Maximum number of decomposed sub-queries.
+        provider: Force a specific provider. Options:
+            - "auto" (default): Try Colab AI first, fallback to Gemini API
+            - "colab": Only use google.colab.ai (fails if unavailable)
+            - "gemini": Only use google.genai Gemini API (requires GEMINI_API_KEY)
     """
+
+    PROVIDER_AUTO = "auto"
+    PROVIDER_COLAB = "colab"
+    PROVIDER_GEMINI = "gemini"
+    VALID_PROVIDERS = {PROVIDER_AUTO, PROVIDER_COLAB, PROVIDER_GEMINI}
 
     def __init__(
         self,
         model_name: str = "gemini-2.5-flash",
         max_expansions: int = 5,
         max_subqueries: int = 3,
+        provider: str = "auto",
     ):
         # Store raw model name (without provider prefix)
         # Handles both "gemini-2.5-flash" and "google/gemini-2.5-flash" formats
         self.model_name = self._extract_model_name(model_name)
         self.max_expansions = max_expansions
         self.max_subqueries = max_subqueries
+        
+        # Validate and store provider choice
+        provider = provider.lower().strip()
+        if provider not in self.VALID_PROVIDERS:
+            logger.warning(
+                "Invalid provider '%s', using 'auto'. Valid options: %s",
+                provider, self.VALID_PROVIDERS
+            )
+            provider = self.PROVIDER_AUTO
+        self.provider = provider
+        logger.info("QueryTransformer initialized: model=%s, provider=%s", self.model_name, self.provider)
         # Note: availability is checked lazily via _get_ai_module/_get_genai_client
 
     @staticmethod
@@ -180,24 +206,49 @@ User query: "{query}"
 
     def _call_model(self, prompt: str) -> str:
         """
-        Try Colab AI first; if unavailable or failing, fall back to Gemini API.
+        Call the appropriate model based on provider setting.
+        
+        - "auto": Try Colab AI first, fallback to Gemini API
+        - "colab": Only use google.colab.ai
+        - "gemini": Only use google.genai Gemini API
         """
-        # Attempt Colab AI
-        ai = _get_ai_module()
-        if ai is not None:
-            text = self._call_colab_ai(prompt, ai)
-            if text:
-                return text
+        if self.provider == self.PROVIDER_COLAB:
+            # Only try Colab AI
+            ai = _get_ai_module()
+            if ai is not None:
+                text = self._call_colab_ai(prompt, ai)
+                if text:
+                    return text
+            logger.warning("Colab AI requested but not available")
+            return ""
 
-        # Attempt Gemini API
-        client = _get_genai_client()
-        if client is not None:
-            text = self._call_gemini(prompt, client)
-            if text:
-                return text
+        elif self.provider == self.PROVIDER_GEMINI:
+            # Only try Gemini API
+            client = _get_genai_client()
+            if client is not None:
+                text = self._call_gemini(prompt, client)
+                if text:
+                    return text
+            logger.warning("Gemini API requested but not available (check GEMINI_API_KEY)")
+            return ""
 
-        # Final fallback: empty string (caller will pass through original query)
-        return ""
+        else:  # PROVIDER_AUTO
+            # Try Colab AI first, then Gemini API
+            ai = _get_ai_module()
+            if ai is not None:
+                text = self._call_colab_ai(prompt, ai)
+                if text:
+                    return text
+
+            # Attempt Gemini API as fallback
+            client = _get_genai_client()
+            if client is not None:
+                text = self._call_gemini(prompt, client)
+                if text:
+                    return text
+
+            # Final fallback: empty string (caller will pass through original query)
+            return ""
 
     def _call_colab_ai(self, prompt: str, ai) -> str:
         """Invoke google.colab.ai.

@@ -27,6 +27,31 @@ The rest of the pipeline (indexing, reranking, metrics) is unchanged.
 - Colab AI uses `"google/gemini-2.5-flash"` format
 - Gemini API uses `"gemini-2.5-flash"` format
 
+## CLI Options
+
+You can control the query transformation provider via command-line arguments in `build_pipeline.py`:
+
+```bash
+# Use auto mode (default): try Colab AI first, fallback to Gemini API
+python scripts/build_pipeline.py --query-transform-provider auto
+
+# Force Google Colab AI only (will fail if not running in Colab)
+python scripts/build_pipeline.py --query-transform-provider colab
+
+# Force Gemini API only (requires GEMINI_API_KEY)
+python scripts/build_pipeline.py --query-transform-provider gemini --gemini-api-key YOUR_KEY
+
+# Specify a different model
+python scripts/build_pipeline.py --query-transform-model gemini-2.0-flash --query-transform-provider gemini
+```
+
+### Available CLI arguments for query transformation:
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--query-transform-model` | `gemini-2.5-flash` | Model to use (e.g., `gemini-2.5-flash`, `gemini-2.0-flash`) |
+| `--query-transform-provider` | `auto` | Provider: `auto`, `colab`, or `gemini` |
+| `--gemini-api-key` | None | Gemini API key (alternative to env var) |
+
 ### Setting `GEMINI_API_KEY` in Colab (avoid storing in repo)
 Run once per session before `build_pipeline.py`:
 ```python
@@ -37,6 +62,9 @@ os.environ["GEMINI_API_KEY"] = "your-key-here"
 # Option 2: use Colab's secret storage (preferred; key not visible in notebook)
 from google.colab import userdata
 os.environ["GEMINI_API_KEY"] = userdata.get("GEMINI_API_KEY")
+
+# Option 3: pass via CLI argument
+# python scripts/build_pipeline.py --gemini-api-key YOUR_KEY --query-transform-provider gemini
 ```
 The code reads the key from the environment at runtime; nothing is committed to git.
 

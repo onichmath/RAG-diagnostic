@@ -97,6 +97,17 @@ def parse_args():
     parser.add_argument("--colbert-model", type=str, default="bert-base-uncased",
                        help="HuggingFace model for ColBERT reranker")
 
+    # Query transformation options
+    parser.add_argument("--query-transform-model", type=str, default="gemini-2.5-flash",
+                       help="Model for query transformation (e.g., gemini-2.5-flash, gemini-2.0-flash)")
+    parser.add_argument("--query-transform-provider", type=str, default="auto",
+                       choices=["auto", "colab", "gemini"],
+                       help="Provider for query transformation: "
+                            "'auto' (try Colab AI first, fallback to Gemini API), "
+                            "'colab' (only google.colab.ai), "
+                            "'gemini' (only google.genai, requires GEMINI_API_KEY)")
+    parser.add_argument("--gemini-api-key", type=str, default=None,
+                       help="Gemini API key (can also be set via GEMINI_API_KEY env var)")
 
     
     return parser.parse_args()
@@ -108,8 +119,16 @@ def main():
     """Run the complete pipeline using LangChain."""
     args = parse_args()
     
+    # Set GEMINI_API_KEY if provided via CLI (before any imports that might use it)
+    import os
+    if args.gemini_api_key:
+        os.environ["GEMINI_API_KEY"] = args.gemini_api_key
+        logger.info("GEMINI_API_KEY set from CLI argument")
+    
     logger.info("Starting RAG Diagnostic Pipeline (LangChain)")
     logger.info("=" * 60)
+    logger.info(f"Query transform provider: {args.query_transform_provider}")
+    logger.info(f"Query transform model: {args.query_transform_model}")
     
     # Step 1: Check existing datasets
     logger.info("Step 1: Checking existing datasets...")
@@ -213,7 +232,10 @@ def main():
             llm_model=args.llm_model,
             
             use_colbert_reranker=args.use_colbert_reranker,
-            colbert_model=args.colbert_model
+            colbert_model=args.colbert_model,
+            
+            query_transform_model=args.query_transform_model,
+            query_transform_provider=args.query_transform_provider,
         )
 
         

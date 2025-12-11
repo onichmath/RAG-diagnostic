@@ -41,14 +41,39 @@ def get_expected_doc_patterns(expected_docs: list):
     return expected_doc_patterns
 
 # def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list):
-def evaluate_rag_system(index_path: Path, queries_file: Path, max_queries: int, k_array: list, use_llm_reranker: bool = False, llm_model: str = "local", use_colbert_reranker: bool = False,
-    colbert_model: str = "bert-base-uncased"):
+def evaluate_rag_system(
+    index_path: Path, 
+    queries_file: Path, 
+    max_queries: int, 
+    k_array: list, 
+    use_llm_reranker: bool = False, 
+    llm_model: str = "local", 
+    use_colbert_reranker: bool = False,
+    colbert_model: str = "bert-base-uncased",
+    query_transform_model: str = "gemini-2.5-flash",
+    query_transform_provider: str = "auto",
+):
     """
     Evaluate the RAG system using the given index and queries.
+    
+    Args:
+        index_path: Path to FAISS index
+        queries_file: Path to JSON file with test queries
+        max_queries: Maximum number of queries to evaluate
+        k_array: List of k values for precision/NDCG calculation
+        use_llm_reranker: Enable local LLM title-based reranker
+        llm_model: Model for LLM reranker (ignored, kept for compatibility)
+        use_colbert_reranker: Enable ColBERT reranker
+        colbert_model: Model for ColBERT reranker
+        query_transform_model: Model for query transformation (e.g., "gemini-2.5-flash")
+        query_transform_provider: Provider for query transformation ("auto", "colab", "gemini")
     """
     test_queries = load_test_queries(queries_file, max_queries)
     vectorstore = load_faiss_index(index_path) 
-    transformer = QueryTransformer()
+    transformer = QueryTransformer(
+        model_name=query_transform_model,
+        provider=query_transform_provider,
+    )
     # Warm start 
     for i in range(1):
         vectorstore.similarity_search("test", k=10)
